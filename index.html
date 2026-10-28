@@ -1322,7 +1322,7 @@ document.addEventListener('change', async ev => {
 const FORMS = {
   login: async f => { const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
     const { data, error } = await sb.auth.signInWithPassword({ email:f.email.value.trim(), password:f.password.value });
-    btn.disabled = false; if(error) return toast('Имэйл эсвэл нууц үг буруу байна','bad'); S.user = data.user; await start(); },
+    btn.disabled = false; if(error){ const m = error.message || ''; return toast(/confirm/i.test(m) ? 'Имэйл баталгаажаагүй байна. Supabase → Authentication → Users дээр Confirm email хийнэ үү.' : /invalid login|credentials/i.test(m) ? 'Имэйл эсвэл нууц үг буруу байна' : 'Нэвтэрч чадсангүй: ' + m, 'bad'); } S.user = data.user; await start(); },
   emp: async f => {
     const id = num(f.id.value);
     const row = { emp_code:f.emp_code.value.trim()||null, full_name:f.full_name.value.trim(), department_id:num(f.department_id.value), position:f.position.value.trim()||null, email:f.email.value.trim()||null, phone:f.phone.value.trim()||null, active:f.active.checked,
