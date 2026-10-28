@@ -45,6 +45,7 @@
 }
 *{box-sizing:border-box}
 html,body{min-height:100%}
+body{margin:0}
 body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.5;
   padding-left:max(0px,env(safe-area-inset-left,0px));padding-right:max(0px,env(safe-area-inset-right,0px))}
 h1,h2,h3,h4{margin:0;text-wrap:balance;line-height:1.25}
@@ -53,26 +54,33 @@ button,input,select,textarea{font:inherit;color:inherit}
 .muted{color:var(--muted)} .faint{color:var(--faint)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
 
-/* shell */
+/* shell — dark sidebar in both themes */
 .shell{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:100vh}
-.side{background:var(--surface);border-right:1px solid var(--line);padding:20px 14px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:22px}
+.side{--s-bg:#131a29;--s-fg:#e8ecf4;--s-muted:#97a2b8;--s-hover:#1e2739;--s-act:#2a3a58;--s-act-fg:#ffffff;--s-line:#222c40;
+  background:var(--s-bg);color:var(--s-fg);border-right:1px solid var(--s-line);padding:20px 14px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:22px}
+:root[data-theme="dark"] .side{--s-bg:#0b1019;--s-hover:#161d2b;--s-act:#22314b;--s-line:#1b2333}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .side{--s-bg:#0b1019;--s-hover:#161d2b;--s-act:#22314b;--s-line:#1b2333}}
 .brand{display:flex;gap:10px;align-items:center;padding:0 6px}
 .brand-mark{width:34px;height:34px;border-radius:8px;background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;flex:none}
+.side .brand-mark{background:#3d7be0;color:#fff}
 .brand b{display:block;font-size:14px;line-height:1.2}
 .brand small{color:var(--muted);font-size:12px}
+.side .brand small{color:var(--s-muted)}
 .nav{display:flex;flex-direction:column;gap:2px}
-.nav button{display:flex;align-items:center;gap:10px;border:0;background:none;padding:9px 10px;border-radius:7px;cursor:pointer;color:var(--muted);font-weight:500;text-align:left;white-space:nowrap}
-.nav button:hover{background:var(--surface-2);color:var(--fg)}
-.nav button[aria-current="page"]{background:var(--accent-soft);color:var(--accent)}
+.nav button{display:flex;align-items:center;gap:10px;border:0;background:none;padding:9px 10px;border-radius:7px;cursor:pointer;color:var(--s-muted);font-weight:500;text-align:left;white-space:nowrap}
+.nav button:hover{background:var(--s-hover);color:var(--s-fg)}
+.nav button[aria-current="page"]{background:var(--s-act);color:var(--s-act-fg)}
+.nav button:focus-visible{outline-color:#8fb4f0}
 .nav svg{flex:none}
-.nav .badge{margin-left:auto;background:var(--bad);color:#fff;font-size:11px;font-weight:600;border-radius:10px;padding:0 7px;line-height:18px}
-.side-foot{margin-top:auto;font-size:12px;color:var(--muted);padding:0 6px;display:flex;flex-direction:column;gap:8px}
+.nav .badge{margin-left:auto;background:#e5484d;color:#fff;font-size:11px;font-weight:600;border-radius:10px;padding:0 7px;line-height:18px}
+.side-foot{margin-top:auto;font-size:12px;color:var(--s-muted);padding:0 6px;display:flex;flex-direction:column;gap:8px}
+.side-foot .btn-link{color:#8fb4f0}
 .main{min-width:0;padding-block:24px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
 @media (min-width:861px){.main{padding-left:32px;padding-right:32px}}
 @media (max-width:860px){
   .shell{grid-template-columns:1fr}
-  .side{position:sticky;top:env(safe-area-inset-top,0px);height:auto;z-index:20;flex-direction:row;align-items:center;padding:8px max(12px,env(safe-area-inset-left,0px));gap:12px;border-right:0;border-bottom:1px solid var(--line);overflow-x:auto}
+  .side{position:sticky;top:env(safe-area-inset-top,0px);height:auto;z-index:20;flex-direction:row;align-items:center;padding:8px max(12px,env(safe-area-inset-left,0px));gap:12px;border-right:0;border-bottom:1px solid var(--s-line);overflow-x:auto}
   .brand div{display:none}
   .nav{flex-direction:row}
   .nav button span.lbl{font-size:13px}
@@ -237,6 +245,62 @@ pre.code{background:var(--surface-2);border-radius:7px;padding:10px 12px;font-fa
 .mail-b p{margin:0}
 .note{font-size:12.5px;color:var(--muted);margin:0}
 
+/* teams (Алба) */
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.tcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:12px;min-width:0}
+.tcard:hover{border-color:var(--accent)}
+.tcard-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.tcard-code{font-size:20px;font-weight:700;letter-spacing:-.01em;overflow-wrap:anywhere}
+.tcard-head{display:flex;gap:10px;align-items:center;min-width:0}
+.tcard-head .p-sub{display:block}
+.tcard-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+.faces{display:flex}
+.faces .av{border:2px solid var(--surface);margin-left:-8px}
+.faces .av:first-child{margin-left:0}
+.faces .av-sm{font-size:10px}
+.org-head{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.org-stats{display:flex;gap:8px;flex-wrap:wrap}
+.org-scroll{overflow-x:auto;padding:20px 12px 24px}
+.tree,.tree ul{display:flex;justify-content:center;list-style:none;margin:0;padding:20px 0 0;position:relative}
+.tree{padding-top:0;min-width:max-content;margin:0 auto}
+.tree li{display:flex;flex-direction:column;align-items:center;position:relative;padding:20px 6px 0}
+.tree > li{padding-top:0}
+.tree li::before,.tree li::after{content:"";position:absolute;top:0;right:50%;width:50%;height:20px;border-top:1.5px solid var(--faint)}
+.tree li::after{right:auto;left:50%;border-left:1.5px solid var(--faint)}
+.tree li:only-child::before{display:none}
+.tree li:only-child::after{border-top:0}
+.tree li:first-child::before,.tree li:last-child::after{border:0 none}
+.tree li:last-child:not(:only-child)::before{border-right:1.5px solid var(--faint);border-top-right-radius:6px}
+.tree li:first-child:not(:only-child)::after{border-top-left-radius:6px}
+.tree > li::before,.tree > li::after{display:none}
+.tree ul::before{content:"";position:absolute;top:0;left:50%;height:20px;border-left:1.5px solid var(--faint)}
+.leaf-group{margin-top:20px;border:1px dashed var(--line);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px;position:relative}
+.leaf-group::before{content:"";position:absolute;top:-21px;left:50%;height:20px;border-left:1.5px solid var(--faint)}
+.onode{display:flex;gap:9px;align-items:center;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--nc,var(--line));border-radius:9px;padding:7px 10px;width:200px;text-align:left;cursor:pointer;position:relative}
+.onode:hover{border-color:var(--accent);border-left-color:var(--nc,var(--accent))}
+.onode.head{box-shadow:var(--shadow)}
+.onode.st-ok{--nc:var(--ok)} .onode.st-warn{--nc:var(--warn)} .onode.st-bad{--nc:var(--bad)} .onode.st-none{--nc:var(--none)}
+.on-txt{min-width:0;display:flex;flex-direction:column}
+.on-name{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.on-pos{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.on-cnt{position:absolute;right:-8px;top:-8px;background:var(--accent);color:var(--accent-fg);font-size:10.5px;font-weight:700;border-radius:10px;padding:0 6px;line-height:17px}
+.ext-mgr{font-size:12px;color:var(--muted);margin-bottom:-12px;display:flex;align-items:center;gap:6px}
+.loose{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.loose .onode{width:auto}
+.chips-row{display:flex;gap:6px;flex-wrap:wrap}
+.pchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:2px 10px 2px 2px;background:var(--surface);cursor:pointer;font-size:12.5px}
+.pchip:hover{border-color:var(--accent)}
+
+/* import preview */
+.imp-sum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+@media (max-width:620px){.imp-sum{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.imp-sum div{background:var(--surface-2);border-radius:8px;padding:10px 12px}
+.imp-sum b{display:block;font-size:22px;font-variant-numeric:tabular-nums;line-height:1.2}
+.imp-sum span{font-size:12px;color:var(--muted)}
+.drop{border:1.5px dashed var(--line);border-radius:10px;padding:22px;text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center;transition:border-color .15s,background .15s}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.last-imp{font-size:12.5px;color:var(--muted)}
+
 .login{min-height:100vh;display:grid;place-items:center;padding:24px max(16px,env(safe-area-inset-left,0px))}
 .login .panel{width:100%;max-width:380px}
 
@@ -272,10 +336,10 @@ const TABLES = { departments:'depts', employees:'emps', training_types:'types', 
 const S = {
   ready:false, auth:null, user:null, view:'dash',
   depts:[], emps:[], types:[], trs:[], logs:[],
-  settings:{ reminder_days:[30,14,7,1,0], hr_email:'', from_email:'Сургалт <noreply@otpclicenses.mn>', company_name:'Манай байгууллага' },
+  settings:{ reminder_days:[30,14,7,1,0], hr_email:'', from_email:'Сургалт <noreply@otpclicenses.mn>', company_name:'Манай байгууллага', last_import:null },
   ef:{ q:'', dept:'', status:'', inactive:false },
   tf:{ q:'', dept:'', type:'', status:'' },
-  openEmp:null
+  openEmp:null, org:null, imp:null
 };
 let IDX = {}; let DEMO_ID = 0;
 
@@ -386,7 +450,7 @@ async function dbUpdate(table, id, patch){
 async function dbDelete(table, id){
   if(!DEMO){ const { error } = await sb.from(table).delete().eq('id', id); if(error) throw error; }
   const k = TABLES[table]; S[k] = S[k].filter(x => x.id !== id);
-  if(table === 'employees') S.trs = S.trs.filter(t => t.employee_id !== id);
+  if(table === 'employees'){ S.trs = S.trs.filter(t => t.employee_id !== id); S.emps.forEach(e => { if(e.manager_id === id) e.manager_id = null; }); }
   if(table === 'training_types') S.trs = S.trs.filter(t => t.training_type_id !== id);
   if(table === 'departments') S.emps.forEach(e => { if(e.department_id === id) e.department_id = null; });
   if(table === 'trainings') S.logs = S.logs.filter(l => l.training_id !== id);
@@ -437,36 +501,52 @@ function rng(seed){ return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let 
 const TR = {а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'yo',ж:'j',з:'z',и:'i',й:'i',к:'k',л:'l',м:'m',н:'n',о:'o',ө:'u',п:'p',р:'r',с:'s',т:'t',у:'u',ү:'u',ф:'f',х:'kh',ц:'ts',ч:'ch',ш:'sh',щ:'sh',ъ:'',ы:'y',ь:'i',э:'e',ю:'yu',я:'ya','-':''};
 const translit = s => [...s.toLowerCase()].map(c => TR[c] ?? c).join('');
 function seedDemo(){
-  const R = rng(20261015), pick = a => a[Math.floor(R()*a.length)], today = todayStr();
+  const R = rng(20261028), pick = a => a[Math.floor(R()*a.length)], today = todayStr();
   let id = 0; const nid = () => ++id;
-  const D = [['Захиргаа, хүний нөөц',12],['Үйлдвэрлэл',50],['Засвар үйлчилгээ',32],['Хөдөлмөрийн аюулгүй байдал',10],['Худалдаа, борлуулалт',26],['Санхүү, нягтлан',20]];
+  // [нэр, хүний тоо, удирдлагын албан тушаал, ахлах албан тушаал, ажилтны албан тушаалууд]
+  const D = [
+    ['BP',34,'BP албаны менежер','Ээлжийн ахлагч',['Оператор','Ахлах оператор','Техникч','Туслах оператор']],
+    ['MT',30,'MT албаны менежер','Засварын ахлагч',['Механик','Цахилгаанчин','Гагнуурчин','Слесарь']],
+    ['CP',28,'CP албаны менежер','Ээлжийн ахлагч',['Оператор','Техникч','Лаборант','Туслах ажилтан']],
+    ['QAQC',14,'QAQC менежер','Ахлах инженер',['Чанарын инженер','Лаборант','Хяналтын техникч']],
+    ['WH',16,'Агуулахын менежер','Ахлах нярав',['Нярав','Ачигч','Тээврийн жолооч','Агуулахын ажилтан']],
+    ['HSE',10,'HSE менежер','Ахлах мэргэжилтэн',['ХАБ-ын мэргэжилтэн','Байгаль орчны мэргэжилтэн','ХАБ-ын байцаагч']],
+    ['Administration',10,'Захиргааны менежер','Ахлах мэргэжилтэн',['Захиргааны ажилтан','Бичиг хэрэг','Жолооч','Нягтлан бодогч']],
+    ['HR',8,'Хүний нөөцийн менежер','Ахлах мэргэжилтэн',['Хүний нөөцийн мэргэжилтэн','Сургалтын зохицуулагч','Цалингийн нягтлан']]
+  ];
   const T = [['ХАБЭА ерөнхий зааварчилгаа',12,'ХАБ','Дотоод сургалт'],['Галын аюулгүй байдал',12,'ГАБ','ОБЕГ'],['Анхны тусламж',24,'АТ','Улаан загалмай'],['Өндөрт ажиллах',12,'ӨА','Дотоод сургалт'],['Цахилгааны аюулгүй ажиллагаа',12,'ЦАА','Эрчим хүчний сургалтын төв'],['Өргөх механизм, ачаа өргөлт',24,'ӨМ','МХЕГ'],['Химийн бодистой ажиллах',24,'ХБ','Дотоод сургалт']];
-  const POS = [['Хүний нөөцийн менежер','Захиргааны ажилтан','Бичиг хэргийн ажилтан','Хууль зүйч'],['Операторч','Ахлах операторч','Үйлдвэрлэлийн ажилтан','Ээлжийн ахлагч','Савлагчин'],['Цахилгаанчин','Слесарь','Гагнуурчин','Засварын инженер','Механик'],['ХАБ-ын инженер','ХАБ-ын мэргэжилтэн','Байгаль орчны мэргэжилтэн'],['Борлуулалтын менежер','Агуулахын нярав','Жолооч','Худалдааны төлөөлөгч'],['Нягтлан бодогч','Ахлах нягтлан','Эдийн засагч','Кассчин']];
-  const NEED = [[0,1],[0,1,4],[0,1,3,4],[0,1,2,3,6],[0,1],[0,1]];
-  const OPT  = [[[2,.5]],[[3,.6],[5,.5],[2,.4]],[[5,.6],[2,.5]],[],[[2,.3]],[[2,.25]]];
+  const NEED = [[0,1,3],[0,1,4,3],[0,1,6],[0,1,6],[0,1,5],[0,1,2,3],[0,1],[0,1]];
+  const OPT  = [[[2,.4],[5,.3]],[[5,.6],[2,.4]],[[2,.4],[3,.3]],[[2,.3]],[[2,.4]],[[6,.5]],[[2,.3]],[[2,.3]]];
   const FN = ['Батбаяр','Энхтуяа','Ганболд','Сарантуяа','Мөнхбат','Оюунчимэг','Төмөрбаатар','Нармандах','Болормаа','Эрдэнэбат','Ариунаа','Батцэцэг','Дашдорж','Анударь','Тэмүүлэн','Хонгорзул','Билгүүн','Номин','Мөнх-Эрдэнэ','Цэцэгмаа','Ганзориг','Солонго','Баярсайхан','Уянга','Отгонбаяр','Наранцэцэг','Пүрэвдорж','Мишээл','Жавхлан','Гэрэлмаа','Чингүүн','Алтанцэцэг','Энхжаргал','Сүхбат','Индра','Хулан','Бат-Очир','Сондор','Ундрах','Золбоо'];
   const LI = ['А','Б','Г','Д','Л','М','Н','О','П','С','Т','Х','Ц','Ч','Ж','Э'];
   S.depts = D.map(([n],i) => ({ id:nid(), name:n, sort:i+1 }));
   S.types = T.map(([n,m]) => ({ id:nid(), name:n, validity_months:m, description:'' }));
   S.emps = []; S.trs = []; S.logs = [];
   const used = new Set(); let k = 0, cert = 100;
-  D.forEach(([, cnt], di) => {
-    for(let i=0;i<cnt;i++){
-      k++; const fn = pick(FN), li = pick(LI);
-      let mail = translit(li)+'.'+translit(fn); let base = mail, j = 2; while(used.has(mail)) mail = base + (j++); used.add(mail);
-      const e = { id:nid(), emp_code:'E'+String(k).padStart(3,'0'), full_name:`${li}.${fn}`, department_id:S.depts[di].id, position:pick(POS[di]), email:mail+'@otpclicenses.mn', phone:'9'+Math.floor(1000000+R()*8999999), photo_url:null, active: R() > .02 };
-      S.emps.push(e);
-      const need = [...NEED[di], ...OPT[di].filter(([, p]) => R() < p).map(([t]) => t)];
-      for(const ti of need){
-        const [, m, pre, prov] = T[ti];
-        const span = m * 30.4; const off = Math.round(R() * (span + 45));
-        const done = addDays(today, -off);
-        if(R() < .3){ const pd = addDays(addMonths(done, -m), -Math.round(R()*20)); S.trs.push({ id:nid(), employee_id:e.id, training_type_id:S.types[ti].id, completed_on:pd, expires_on:addMonths(pd, m), certificate_no:`${pre}-${pd.slice(0,4)}-${String(cert++).padStart(4,'0')}`, provider:prov, notes:'' }); }
-        S.trs.push({ id:nid(), employee_id:e.id, training_type_id:S.types[ti].id, completed_on:done, expires_on:addMonths(done, m), certificate_no:`${pre}-${done.slice(0,4)}-${String(cert++).padStart(4,'0')}`, provider:prov, notes:'' });
-      }
+  const mkEmp = (di, pos, mgr) => {
+    k++; const fn = pick(FN), li = pick(LI);
+    let mail = translit(li)+'.'+translit(fn); const base = mail; let j = 2; while(used.has(mail)) mail = base + (j++); used.add(mail);
+    const e = { id:nid(), emp_code:'E'+String(k).padStart(3,'0'), full_name:`${li}.${fn}`, department_id:S.depts[di].id, position:pos,
+      email:mail+'@otpclicenses.mn', phone:'9'+Math.floor(1000000+R()*8999999), photo_url:null, active: mgr == null || R() > .02,
+      manager_id:mgr, hired_on:addDays(today, -Math.round(60 + R()*3600)), notes:'' };
+    S.emps.push(e);
+    const need = [...NEED[di], ...OPT[di].filter(([, p]) => R() < p).map(([t]) => t)];
+    for(const ti of need){
+      const [, m, pre, prov] = T[ti];
+      const span = m * 30.4; const off = Math.round(R() * (span + 45));
+      const done = addDays(today, -off);
+      if(R() < .3){ const pd = addDays(addMonths(done, -m), -Math.round(R()*20)); S.trs.push({ id:nid(), employee_id:e.id, training_type_id:S.types[ti].id, completed_on:pd, expires_on:addMonths(pd, m), certificate_no:`${pre}-${pd.slice(0,4)}-${String(cert++).padStart(4,'0')}`, provider:prov, notes:'' }); }
+      S.trs.push({ id:nid(), employee_id:e.id, training_type_id:S.types[ti].id, completed_on:done, expires_on:addMonths(done, m), certificate_no:`${pre}-${done.slice(0,4)}-${String(cert++).padStart(4,'0')}`, provider:prov, notes:'' });
     }
+    return e;
+  };
+  D.forEach(([, cnt, headPos, supPos, staffPos], di) => {
+    const head = mkEmp(di, headPos, null);
+    const nSup = cnt >= 25 ? 3 : cnt >= 12 ? 2 : 1;
+    const sups = Array.from({ length:nSup }, () => mkEmp(di, supPos, head.id));
+    for(let i = 1 + nSup; i < cnt; i++) mkEmp(di, pick(staffPos), cnt <= 10 && R() < .5 ? head.id : pick(sups).id);
   });
-  S.settings = { reminder_days:[30,14,7,1,0], hr_email:'hr@otpclicenses.mn', from_email:'Сургалт <noreply@otpclicenses.mn>', company_name:'ОТП ХХК' };
+  S.settings = { reminder_days:[30,14,7,1,0], hr_email:'hr@otpclicenses.mn', from_email:'Сургалт <noreply@otpclicenses.mn>', company_name:'ОТП ХХК', last_import:null };
   DEMO_ID = id; reindex();
   const days = [0,1,7,14,30];
   for(const c of IDX.current){
@@ -483,6 +563,9 @@ const I = {
   emps:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6"/><path d="M16 4a4 4 0 0 1 0 8M22 21c0-3-1.5-5-4-5.7"/></svg>',
   trs:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>',
   settings:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+  org:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="5" rx="1"/><rect x="2" y="17" width="6" height="5" rx="1"/><rect x="16" y="17" width="6" height="5" rx="1"/><path d="M12 7v5M5 17v-2.5h14V17M12 12v2.5"/></svg>',
+  back:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
+  up:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
   mark:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>'
 };
 
@@ -494,7 +577,7 @@ function render(){
     app.innerHTML = `<div class="login"><div class="spinner" role="status" aria-label="Ачаалж байна"></div></div>`; return;
   }
   const bad = activeCurrent().filter(c => c.status === 'bad').length;
-  const nav = [['dash','Хянах самбар'],['emps','Ажилтнууд'],['trs','Сургалтын бүртгэл'],['settings','Тохиргоо']];
+  const nav = [['dash','Хянах самбар'],['org','Алба'],['emps','Ажилтнууд'],['trs','Сургалтын бүртгэл'],['settings','Тохиргоо']];
   app.innerHTML = `<div class="shell">
     <aside class="side">
       <div class="brand"><span class="brand-mark">${I.mark}</span><div><b>Сургалтын бүртгэл</b><small>${esc(S.settings.company_name||'')}</small></div></div>
@@ -503,8 +586,10 @@ function render(){
     </aside>
     <main class="main"><div class="wrap">${DEMO ? demoBar() : ''}${VIEWS[S.view]()}</div></main>
   </div>`;
+  // org chart: дээд удирдлагыг дэлгэцийн голд гаргана
+  $$('.org-scroll').forEach(el => { const h = el.querySelector('.onode.head'); if(!h) return; const a = el.getBoundingClientRect(), b = h.getBoundingClientRect(); el.scrollLeft += (b.left + b.width/2) - (a.left + a.width/2); });
 }
-const demoBar = () => `<div class="demo-bar"><b>Демо горим.</b><span>Жишээ 150 ажилтантай. Өөрчлөлт хадгалагдахгүй, имэйл илгээгдэхгүй. Жинхэнээр ажиллуулахын тулд Supabase-ийн мэдээллээ оруулна.</span></div>`;
+const demoBar = () => `<div class="demo-bar"><b>Демо горим.</b><span>Жишээ 150 ажилтантай. Өөрчлөлт хадгалагдахгүй, имэйл илгээгдэхгүй. Жинхэнээр ажиллуулах заавар: GitHub дээрх README файл.</span></div>`;
 
 function viewLogin(){
   return `<div class="login"><div class="panel"><div class="panel-body" style="display:flex;flex-direction:column;gap:16px">
@@ -528,14 +613,15 @@ function viewDash(){
     const ids = new Set(act.filter(e => e.department_id === d.id).map(e => e.id));
     const c = { ok:0, warn:0, bad:0 }; cur.forEach(x => { if(ids.has(x.employee_id)) c[x.status]++; });
     const tot = c.ok + c.warn + c.bad, p = tot ? Math.round(c.ok/tot*100) : 0, w = v => tot ? (v/tot*100).toFixed(1) : 0;
-    return `<div class="drow" data-act="goto-emps" data-dept="${d.id}" role="button" tabindex="0"><span class="dname">${esc(d.name)}</span><span class="muted mono">${ids.size} хүн</span>
+    return `<div class="drow" data-act="goto-org" data-dept="${d.id}" role="button" tabindex="0"><span class="dname">${esc(d.name)}</span><span class="muted mono">${ids.size} хүн</span>
       <span class="bar" title="Хүчинтэй ${c.ok} · Дөхсөн ${c.warn} · Дууссан ${c.bad}"><i class="b-ok" style="width:${w(c.ok)}%"></i><i class="b-warn" style="width:${w(c.warn)}%"></i><i class="b-bad" style="width:${w(c.bad)}%"></i></span><span class="pct">${p}%</span></div>`;
   }).join('');
   const up = cur.filter(c => c.days >= 0 && c.days <= 60).sort((a,b) => a.days - b.days);
   const od = cur.filter(c => c.days < 0).sort((a,b) => a.days - b.days);
   return `
   <div class="page-head"><div><h1>Хянах самбар</h1><p>${fmtDate(todayStr())} байдлаар · ${act.length} идэвхтэй ажилтан, ${S.depts.length} алба</p></div>
-    <div class="actions"><button class="btn" data-act="bulk">Олноор бүртгэх</button><button class="btn btn-primary" data-act="new-emp">+ Ажилтан нэмэх</button></div></div>
+    <div class="actions">${importBtn()}<button class="btn" data-act="bulk">Олноор бүртгэх</button><button class="btn btn-primary" data-act="new-emp">+ Ажилтан нэмэх</button></div></div>
+  ${S.settings.last_import ? `<p class="last-imp" style="margin:-8px 0 0">${lastImportText()}</p>` : ''}
   <div class="tiles">
     ${tile('ok','Хүчинтэй сургалт', n.ok, `Нийт ${cur.length}-аас ${pct}%`, 'ok')}
     ${tile('warn',`${warnDays()} хоногт дуусах`, n.warn, 'Сануулга илгээгдэнэ', 'warn')}
@@ -557,11 +643,93 @@ function personRow(c){
     <span class="p-right"><span class="mono">${fmtDate(c.expires_on)}</span>${chip(c.status, daysText(c.days))}</span></button>`;
 }
 
+/* --- teams (Алба) / org chart --- */
+function teamTree(deptId){
+  const members = S.emps.filter(e => e.active && e.department_id === deptId);
+  const inDept = new Set(members.map(e => e.id)), kids = new Map(), roots = [];
+  for(const e of members){
+    if(e.manager_id && e.manager_id !== e.id && inDept.has(e.manager_id)){ if(!kids.has(e.manager_id)) kids.set(e.manager_id, []); kids.get(e.manager_id).push(e); }
+    else roots.push(e);
+  }
+  const size = new Map(), seen = new Set();
+  const count = e => { if(seen.has(e.id)) return 0; seen.add(e.id); let n = 1; for(const c of kids.get(e.id)||[]) n += count(c); size.set(e.id, n); return n; };
+  roots.forEach(count);
+  members.filter(e => !seen.has(e.id)).forEach(e => { roots.push(e); count(e); }); // давталттай (A→B→A) холбоосыг тасална
+  const ord = (a,b) => (size.get(b.id)||1) - (size.get(a.id)||1) || a.full_name.localeCompare(b.full_name,'mn');
+  kids.forEach(l => l.sort(ord)); roots.sort(ord);
+  return { members, kids, roots, size };
+}
+function teamStats(members){
+  const ids = new Set(members.map(e => e.id)), c = { ok:0, warn:0, bad:0 };
+  activeCurrent().forEach(x => { if(ids.has(x.employee_id)) c[x.status]++; });
+  const tot = c.ok + c.warn + c.bad;
+  return { c, tot, pct: tot ? Math.round(c.ok/tot*100) : 0, w: v => tot ? (v/tot*100).toFixed(1) : 0 };
+}
+const statusBar = st => `<span class="bar" title="Хүчинтэй ${st.c.ok} · Дөхсөн ${st.c.warn} · Дууссан ${st.c.bad}"><i class="b-ok" style="width:${st.w(st.c.ok)}%"></i><i class="b-warn" style="width:${st.w(st.c.warn)}%"></i><i class="b-bad" style="width:${st.w(st.c.bad)}%"></i></span>`;
+
+function viewOrg(){
+  if(S.org && IDX.dept.has(S.org)) return viewTeam(S.org);
+  const noDept = S.emps.filter(e => e.active && !IDX.dept.has(e.department_id)).length;
+  const cards = sortedDepts().map(d => {
+    const t = teamTree(d.id), st = teamStats(t.members);
+    const head = t.roots[0] && (t.size.get(t.roots[0].id)||1) > 1 ? t.roots[0] : null;
+    const faces = t.members.filter(e => e !== head).slice(0,5);
+    return `<button class="tcard" data-act="goto-org" data-dept="${d.id}">
+      <span class="tcard-top"><span class="tcard-code">${esc(d.name)}</span><span class="chip chip-plain">${t.members.length} хүн</span></span>
+      ${head ? `<span class="tcard-head">${avatar(head,'md')}<span style="min-width:0"><span class="p-name">${esc(head.full_name)}</span><span class="p-sub">${esc(head.position||'Удирдлага')}</span></span></span>`
+             : `<span class="note">Удирдлага тодорхойлоогүй</span>`}
+      ${statusBar(st)}
+      <span class="tcard-foot"><span class="faces">${faces.map(e => avatar(e,'sm')).join('')}</span><span><b class="pct" style="color:var(--fg)">${st.pct}%</b> хүчинтэй${st.c.bad?` · <span style="color:var(--bad)">${st.c.bad} дууссан</span>`:''}</span></span>
+    </button>`;
+  }).join('');
+  return `<div class="page-head"><div><h1>Алба</h1><p>${S.depts.length} алба · алба дээр дарж бүтцийг нь харна</p></div>
+    <div class="actions"><button class="btn" data-act="nav" data-v="settings">Алба засах</button></div></div>
+  ${S.depts.length ? `<div class="tgrid">${cards}</div>` : '<div class="panel empty">Алба бүртгэгдээгүй байна. Тохиргоо хэсгээс нэмнэ үү.</div>'}
+  ${noDept ? `<p class="note">${noDept} ажилтан албанд хуваарилагдаагүй байна. <button class="btn-link" data-act="goto-emps" data-dept="">Ажилтнууд руу</button></p>` : ''}`;
+}
+
+function viewTeam(deptId){
+  const d = IDX.dept.get(deptId), t = teamTree(deptId), st = teamStats(t.members);
+  const onode = (e, head) => { const s = empStatus(e.id), n = (t.kids.get(e.id)||[]).length;
+    return `<button class="onode st-${s} ${head?'head':''}" data-act="profile" data-id="${e.id}" title="${esc(e.full_name)} — ${esc(e.position||'')} · ${ST[s]}">${avatar(e,'sm')}<span class="on-txt"><span class="on-name">${esc(e.full_name)}</span><span class="on-pos">${esc(e.position||'—')}</span></span>${n?`<span class="on-cnt" title="${n} шууд харьяалагдах">${n}</span>`:''}</button>`; };
+  const drawn = new Set();
+  const branch = (e, depth) => {
+    drawn.add(e.id);
+    const ch = (t.kids.get(e.id)||[]).filter(c => !drawn.has(c.id));
+    const leaves = ch.filter(c => !(t.kids.get(c.id)||[]).length), inner = ch.filter(c => (t.kids.get(c.id)||[]).length);
+    leaves.forEach(c => drawn.add(c.id));
+    const group = (l, top = true) => `<div class="leaf-group"${top ? '' : ' style="margin-top:0"'}>${l.map(c => onode(c)).join('')}</div>`;
+    let sub = '';
+    if(ch.length){
+      if(!inner.length && leaves.length > 3) sub = group(leaves);
+      else sub = `<ul>${inner.map(c => branch(c, depth+1)).join('')}${leaves.length > 3 ? `<li>${group(leaves, false)}</li>` : leaves.map(c => `<li>${onode(c)}</li>`).join('')}</ul>`;
+    }
+    return `<li>${onode(e, depth === 0)}${sub}</li>`;
+  };
+  const trees = t.roots.filter(r => (t.size.get(r.id)||1) > 1), loose = t.roots.filter(r => (t.size.get(r.id)||1) === 1);
+  const ext = r => { const m = r.manager_id && IDX.emp.get(r.manager_id); return m ? `<div class="ext-mgr">${I.up}<span>Удирдлага: <button class="btn-link" data-act="profile" data-id="${m.id}">${esc(m.full_name)}</button> (${esc(deptName(m.department_id))})</span></div>` : ''; };
+  const tile = (cls, lbl, val, sub, stv) => `<button class="tile ${cls}" data-act="goto-trs" data-st="${stv}" data-dept="${deptId}"><span class="t-lbl">${lbl}</span><span class="t-num">${val}</span><span class="t-sub">${sub}</span></button>`;
+  return `<div class="page-head"><div class="org-head"><button class="btn btn-sm" data-act="org-back">${I.back}Бүх алба</button><div><h1>${esc(d.name)}</h1><p>${t.members.length} идэвхтэй ажилтан${trees[0] ? ' · Удирдлага: '+esc(trees[0].full_name) : ''}</p></div></div>
+    <div class="actions"><button class="btn" data-act="goto-emps" data-dept="${deptId}">Жагсаалтаар харах</button><button class="btn btn-primary" data-act="new-emp" data-dept="${deptId}">+ Ажилтан нэмэх</button></div></div>
+  <div class="tiles">
+    ${tile('ok','Хүчинтэй сургалт', st.c.ok, `Нийт ${st.tot}-аас ${st.pct}%`, 'ok')}
+    ${tile('warn',`${warnDays()} хоногт дуусах`, st.c.warn, 'Сануулга илгээгдэнэ', 'warn')}
+    ${tile('bad','Хугацаа дууссан', st.c.bad, 'Давтан сургалт шаардлагатай', 'bad')}
+    ${tile('','Сургалтгүй ажилтан', t.members.filter(e => !(IDX.byEmp.get(e.id)||[]).length).length, 'Нэг ч бүртгэлгүй', 'none')}
+  </div>
+  <section class="panel"><div class="panel-head"><h2>Бүтэц</h2><div class="legend"><span><i style="background:var(--ok)"></i>Бүх сургалт хүчинтэй</span><span><i style="background:var(--warn)"></i>Дуусах дөхсөн</span><span><i style="background:var(--bad)"></i>Дууссан</span><span><i style="background:var(--none)"></i>Сургалтгүй</span></div></div>
+    ${trees.length ? `<div class="org-scroll">${trees.map(r => `<div style="display:flex;flex-direction:column;align-items:center;gap:16px;margin-bottom:28px">${ext(r)}<ul class="tree">${branch(r, 0)}</ul></div>`).join('')}</div>`
+      : `<div class="panel-body"><p class="note">Энэ албанд удирдлагын шатлал тохируулаагүй байна. Ажилтны профайл → <b>Мэдээлэл засах</b> → <b>Шууд удирдлага</b> талбарыг бөглөхөд бүтэц энд автоматаар зурагдана.</p></div>`}
+  </section>
+  ${loose.length ? `<section class="panel"><div class="panel-head"><h2>${trees.length ? 'Удирдлага тодорхойлоогүй' : 'Ажилтнууд'}</h2><span class="chip chip-plain">${loose.length}</span></div>
+    <div class="panel-body">${loose.some(r => r.manager_id && IDX.emp.has(r.manager_id)) ? '<p class="note" style="margin-bottom:10px">Зарим нь өөр албаны удирдлагад харьяалагддаг.</p>' : ''}<div class="loose">${loose.map(r => onode(r)).join('')}</div></div></section>` : ''}`;
+}
+
 /* --- employees --- */
 function viewEmps(){
   const f = S.ef;
   return `<div class="page-head"><div><h1>Ажилтнууд</h1><p>Профайл, зураг, сургалтын түүх</p></div>
-    <div class="actions"><button class="btn" data-act="goto-import">CSV импорт</button><button class="btn btn-primary" data-act="new-emp">+ Ажилтан нэмэх</button></div></div>
+    <div class="actions">${importBtn()}<button class="btn btn-primary" data-act="new-emp">+ Ажилтан нэмэх</button></div></div>
   <div class="toolbar">
     <input class="inp search" id="ef-q" type="search" placeholder="Нэр, код, албан тушаал, имэйлээр хайх" value="${esc(f.q)}" data-filter="ef" data-key="q" aria-label="Хайх">
     <select class="inp" id="ef-dept" data-filter="ef" data-key="dept" aria-label="Алба"><option value="">Бүх алба</option>${sortedDepts().map(d => `<option value="${d.id}" ${f.dept==d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select>
@@ -588,7 +756,7 @@ function listEmps(){
 function viewTrs(){
   const f = S.tf;
   return `<div class="page-head"><div><h1>Сургалтын бүртгэл</h1><p>Ажилтан бүрийн сургалт тус бүрийн хамгийн сүүлийн бичлэг</p></div>
-    <div class="actions"><button class="btn" data-act="export">CSV экспорт</button><button class="btn btn-primary" data-act="bulk">Олноор бүртгэх</button></div></div>
+    <div class="actions">${importBtn()}<button class="btn" data-act="export">CSV экспорт</button><button class="btn btn-primary" data-act="bulk">Олноор бүртгэх</button></div></div>
   <div class="toolbar">
     <input class="inp search" id="tf-q" type="search" placeholder="Нэр, код, гэрчилгээний дугаар" value="${esc(f.q)}" data-filter="tf" data-key="q" aria-label="Хайх">
     <select class="inp" id="tf-dept" data-filter="tf" data-key="dept" aria-label="Алба"><option value="">Бүх алба</option>${sortedDepts().map(d => `<option value="${d.id}" ${f.dept==d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select>
@@ -625,7 +793,7 @@ function viewSettings(){
   const s = S.settings, pend = pendingReminders();
   const sample = pend[0] || activeCurrent().find(c => c.days >= 0) ;
   const se = sample ? IDX.emp.get(sample.employee_id) : null;
-  return `<div class="page-head"><div><h1>Тохиргоо</h1><p>Сануулга, алба, сургалтын төрөл, импорт</p></div></div>
+  return `<div class="page-head"><div><h1>Тохиргоо</h1><p>Сануулга, алба, сургалтын төрөл, Excel импорт</p></div></div>
   <div class="cols">
     <section class="panel"><div class="panel-head"><h2>Имэйл сануулга</h2></div><div class="panel-body">
       <form data-form="settings" style="display:flex;flex-direction:column;gap:12px">
@@ -661,22 +829,27 @@ function viewSettings(){
       <form data-form="add-type" class="set-row" style="margin-top:6px"><input class="inp" id="nt-name" name="name" placeholder="Шинэ сургалт" required><input class="inp mono" id="nt-m" name="months" type="number" min="1" value="12" aria-label="Сар"><button class="btn btn-sm" type="submit">Нэмэх</button></form>
     </div></section>
   </div>
-  <section class="panel" id="import"><div class="panel-head"><h2>Excel / CSV-ээс импорт</h2></div><div class="panel-body">
-    <div class="cols">
-      <div style="display:flex;flex-direction:column;gap:10px"><h4 style="font-size:14px">1. Ажилтнууд</h4>
-        <p class="note">Excel-ээ "CSV UTF-8" хэлбэрээр хадгална. Эхний мөр гарчиг. Код давхцвал мэдээллийг шинэчилнэ. Байхгүй алба автоматаар үүснэ.</p>
-        <pre class="code">Код,Овог нэр,Алба,Албан тушаал,Имэйл,Утас
-E001,Б.Батбаяр,Үйлдвэрлэл,Операторч,b.batbayar@otpclicenses.mn,99112233</pre>
-        <label class="btn" style="align-self:flex-start">Ажилтны CSV сонгох<input type="file" accept=".csv,text/csv,.txt" data-import="emps" hidden></label></div>
-      <div style="display:flex;flex-direction:column;gap:10px"><h4 style="font-size:14px">2. Сургалтууд</h4>
-        <p class="note">Дуусах огноог сургалтын төрлийн хугацаагаар автоматаар бодно. Огноо: 2026-03-15 эсвэл 2026.03.15</p>
-        <pre class="code">Код,Сургалт,Хамрагдсан огноо,Гэрчилгээ №,Байгууллага
-E001,Галын аюулгүй байдал,2026-03-15,ГАБ-2026-0142,ОБЕГ</pre>
-        <label class="btn" style="align-self:flex-start">Сургалтын CSV сонгох<input type="file" accept=".csv,text/csv,.txt" data-import="trs" hidden></label></div>
+  <section class="panel" id="import"><div class="panel-head"><h2>Excel матриц оруулах</h2><span class="last-imp">${lastImportText()}</span></div><div class="panel-body" style="display:flex;flex-direction:column;gap:14px">
+    <div class="drop" data-drop>
+      <b>Сургалтын матриц (.xlsx) эсвэл CSV файлаа энд чирж оруулна</b>
+      <span class="note" style="max-width:560px">Долоо хоног бүр шинэчилсэн файлаа оруулахад шинэ сургалтууд нэмэгдэж, ажилтны мэдээлэл шинэчлэгдэнэ. Аль хэдийн байгаа бичлэг давхардахгүй. Оруулахаас өмнө юу өөрчлөгдөхийг урьдчилан харуулна.</span>
+      ${importBtn('Файл сонгох', 'btn btn-primary')}
     </div>
+    <details class="hist"><summary>Ямар хэлбэрийн файл уншдаг вэ?</summary>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+        <p class="note"><b>1. Матриц</b> — мөр бүр ажилтан, багана бүр сургалт, нүдэнд огноо. Хамрагдсан эсвэл дуусах огноо эсэхийг оруулахдаа сонгоно.</p>
+        <pre class="code">Код  | Овог нэр   | Алба | Албан тушаал | Галын аюулгүй байдал | Анхны тусламж
+E001 | Б.Батбаяр  | BP   | Оператор     | 2026.03.15           | 2025.11.02</pre>
+        <p class="note"><b>2. Хоёр мөр гарчигтай матриц</b> — сургалт бүрийн доор "Хамрагдсан", "Дуусах" (мөн "Гэрчилгээ") дэд багана.</p>
+        <p class="note"><b>3. Жагсаалт</b> — мөр бүр нэг сургалт.</p>
+        <pre class="code">Код  | Овог нэр  | Сургалт              | Хамрагдсан огноо | Гэрчилгээ №  | Байгууллага
+E001 | Б.Батбаяр | Галын аюулгүй байдал | 2026-03-15       | ГАБ-2026-142 | ОБЕГ</pre>
+        <p class="note"><b>4. Ажилтны жагсаалт</b> — сургалтгүй байсан ч болно. "Удирдлага" багана байвал (нэр эсвэл код) Алба цэсний бүтэц автоматаар зурагдана. Бусад танигдах багана: Имэйл, Утас, Ажилд орсон огноо.</p>
+        <p class="note">Ажилтныг эхлээд код, байхгүй бол нэрээр нь таньдаг. Гарчгийн дээрх гарчиг, тайлбар мөрүүдийг автоматаар алгасна. "BP" гэх мэт бүлгийн гарчигтай мөрийн доорх хүмүүст алба автоматаар оноогдоно.</p>
+      </div></details>
   </div></section>`;
 }
-const VIEWS = { dash:viewDash, emps:viewEmps, trs:viewTrs, settings:viewSettings };
+const VIEWS = { dash:viewDash, org:viewOrg, emps:viewEmps, trs:viewTrs, settings:viewSettings };
 
 /* ---------- modals ---------- */
 function openModal({ title, body, wide=false, drawer=false }){
@@ -684,7 +857,7 @@ function openModal({ title, body, wide=false, drawer=false }){
     <header class="m-head"><h2>${esc(title)}</h2><button class="icon-btn" data-act="close" aria-label="Хаах">×</button></header><div class="m-body">${body}</div></div></div>`;
   const first = $('#modal-root .m-body input:not([type=hidden]):not([type=file]), #modal-root .m-body select'); if(first && !drawer) first.focus();
 }
-function closeModal(){ $('#modal-root').innerHTML = ''; S.openEmp = null; }
+function closeModal(){ $('#modal-root').innerHTML = ''; S.openEmp = null; S.imp = null; }
 function askConfirm(msg, okLabel='Устгах'){
   return new Promise(res => {
     const root = $('#confirm-root');
@@ -700,11 +873,17 @@ function profileBody(id){
   const e = IDX.emp.get(id); if(!e) return '<div class="empty">Ажилтан олдсонгүй.</div>';
   const cur = (IDX.byEmp.get(id)||[]).sort((a,b) => a.days - b.days);
   const old = S.trs.filter(t => t.employee_id === id && !IDX.currentIds.has(t.id)).sort((a,b) => b.expires_on.localeCompare(a.expires_on));
+  const mgr = e.manager_id ? IDX.emp.get(e.manager_id) : null;
+  const reps = S.emps.filter(x => x.manager_id === id && x.active).sort((a,b) => a.full_name.localeCompare(b.full_name,'mn'));
   return `<div class="prof-top"><div class="prof-photo">${avatar(e,'xl')}<label class="btn btn-sm">Зураг ${e.photo_url?'солих':'оруулах'}<input type="file" accept="image/*" data-photo="${id}" hidden></label></div>
     <div style="min-width:0"><h3>${esc(e.full_name)}</h3><p class="muted" style="margin:2px 0 0">${esc(e.position||'—')} · ${esc(deptName(e.department_id))}</p>
       <div style="margin-top:8px">${e.active ? chip(empStatus(id)) : chip('none','Ажлаас гарсан')}</div>
-      <dl class="kv"><dt>Код</dt><dd class="mono">${esc(e.emp_code||'—')}</dd><dt>Имэйл</dt><dd>${esc(e.email||'—')}</dd><dt>Утас</dt><dd class="mono">${esc(e.phone||'—')}</dd></dl>
+      <dl class="kv"><dt>Код</dt><dd class="mono">${esc(e.emp_code||'—')}</dd><dt>Имэйл</dt><dd>${e.email?`<a href="mailto:${esc(e.email)}">${esc(e.email)}</a>`:'—'}</dd><dt>Утас</dt><dd class="mono">${e.phone?`<a href="tel:${esc(e.phone)}">${esc(e.phone)}</a>`:'—'}</dd>
+        <dt>Ажилд орсон</dt><dd>${e.hired_on ? `<span class="mono">${fmtDate(e.hired_on)}</span> <span class="muted">· ${tenure(e.hired_on)}</span>` : '—'}</dd>
+        <dt>Шууд удирдлага</dt><dd>${mgr ? `<button class="pchip" data-act="profile" data-id="${mgr.id}">${avatar(mgr,'sm')}${esc(mgr.full_name)}</button> <span class="muted">${esc(mgr.position||'')}</span>` : '—'}</dd></dl>
+      ${e.notes ? `<p class="note" style="margin-top:10px;white-space:pre-line">${esc(e.notes)}</p>` : ''}
       <div class="actions" style="margin-top:14px"><button class="btn btn-sm" data-act="edit-emp" data-id="${id}">Мэдээлэл засах</button><button class="btn btn-sm btn-danger" data-act="del-emp" data-id="${id}">Устгах</button></div></div></div>
+  ${reps.length ? `<div><h4 style="font-size:14px;margin-bottom:8px">Шууд харьяалагдах (${reps.length})</h4><div class="chips-row">${reps.map(r => `<button class="pchip" data-act="profile" data-id="${r.id}">${avatar(r,'sm')}${esc(r.full_name)}</button>`).join('')}</div></div>` : ''}
   <div class="sec-head"><h4>Сургалтууд (${cur.length})</h4><button class="btn btn-sm btn-primary" data-act="new-tr" data-emp="${id}">+ Сургалт нэмэх</button></div>
   <div class="tr-list">${cur.length ? cur.map(c => trCard(c, true)).join('') : '<div class="empty">Сургалт бүртгэгдээгүй байна.</div>'}</div>
   ${old.length ? `<details class="hist"><summary>Өмнөх бичлэгүүд (${old.length})</summary><div class="tr-list" style="margin-top:8px">${old.map(t => trCard(t, false)).join('')}</div></details>` : ''}`;
@@ -716,8 +895,18 @@ function trCard(t, isCur){
     <div>${isCur ? chip(t.status, daysText(t.days)) : chip('plain','Өмнөх')}</div>
     <div class="tr-act">${isCur?`<button class="btn btn-sm" data-act="renew" data-id="${t.id}">Сунгах</button>`:''}<button class="btn btn-sm" data-act="edit-tr" data-id="${t.id}">Засах</button><button class="btn btn-sm btn-danger" data-act="del-tr" data-id="${t.id}">Устгах</button></div></div>`;
 }
-function empForm(e){
-  e = e || { active:true, department_id: S.ef.dept ? Number(S.ef.dept) : (sortedDepts()[0]?.id ?? null) };
+function tenure(d){ const m = Math.floor(-daysUntil(d) / 30.44); if(m < 0) return 'эхлээгүй'; const y = Math.floor(m/12), r = m % 12; return (y ? y+' жил ' : '') + (r || !y ? r+' сар' : '').trim(); }
+function mgrOptions(e){
+  const others = S.emps.filter(x => x.active && x.id !== e.id && !(e.id && isUnder(x.id, e.id)));
+  const same = others.filter(x => x.department_id === e.department_id), rest = others.filter(x => x.department_id !== e.department_id);
+  const opt = x => `<option value="${x.id}" ${e.manager_id===x.id?'selected':''}>${esc(x.full_name)}${x.position?' — '+esc(x.position):''}${x.department_id!==e.department_id?' · '+esc(deptName(x.department_id)):''}</option>`;
+  const by = l => l.sort((a,b) => (S.emps.some(y => y.manager_id === b.id) - S.emps.some(y => y.manager_id === a.id)) || a.full_name.localeCompare(b.full_name,'mn'));
+  return `<option value="">— Байхгүй (албаны дээд удирдлага) —</option>${same.length?`<optgroup label="${esc(deptName(e.department_id))}">${by(same).map(opt).join('')}</optgroup>`:''}${rest.length?`<optgroup label="Бусад алба">${by(rest).map(opt).join('')}</optgroup>`:''}`;
+}
+// x нь root-ийн доор (шууд эсвэл шууд бус) байгаа эсэх — давталт үүсгэхээс сэргийлнэ
+function isUnder(x, root){ const seen = new Set(); let cur = IDX.emp.get(x); while(cur && cur.manager_id && !seen.has(cur.id)){ if(cur.manager_id === root) return true; seen.add(cur.id); cur = IDX.emp.get(cur.manager_id); } return false; }
+function empForm(e, deptId){
+  e = e || { active:true, department_id: deptId ?? (S.ef.dept ? Number(S.ef.dept) : (sortedDepts()[0]?.id ?? null)) };
   return `<form data-form="emp" style="display:flex;flex-direction:column;gap:12px"><input type="hidden" name="id" value="${e.id||''}">
     <div class="grid2"><div class="field"><label for="f-code">Ажилтны код</label><input class="inp mono" id="f-code" name="emp_code" value="${esc(e.emp_code||'')}" placeholder="E151"></div>
       <div class="field"><label for="f-name">Овог нэр</label><input class="inp" id="f-name" name="full_name" required value="${esc(e.full_name||'')}" placeholder="Б.Батбаяр"></div></div>
@@ -725,6 +914,9 @@ function empForm(e){
       <div class="field"><label for="f-pos">Албан тушаал</label><input class="inp" id="f-pos" name="position" value="${esc(e.position||'')}"></div></div>
     <div class="grid2"><div class="field"><label for="f-mail">Имэйл (сануулга энд очно)</label><input class="inp" id="f-mail" name="email" type="email" value="${esc(e.email||'')}"></div>
       <div class="field"><label for="f-ph">Утас</label><input class="inp mono" id="f-ph" name="phone" value="${esc(e.phone||'')}"></div></div>
+    <div class="grid2"><div class="field"><label for="f-mgr">Шууд удирдлага</label><select class="inp" id="f-mgr" name="manager_id">${mgrOptions(e)}</select></div>
+      <div class="field"><label for="f-hire">Ажилд орсон огноо</label><input class="inp mono" id="f-hire" type="date" name="hired_on" value="${esc(e.hired_on||'')}"></div></div>
+    <div class="field"><label for="f-notes">Тэмдэглэл</label><textarea class="inp" id="f-notes" name="notes" placeholder="Мэргэшил, үнэмлэх, онцгой анхаарах зүйл…">${esc(e.notes||'')}</textarea></div>
     <label class="check"><input type="checkbox" name="active" id="f-act" ${e.active?'checked':''}>Идэвхтэй ажиллаж байгаа</label>
     <div class="m-foot"><button class="btn" type="button" data-act="${e.id?'back-profile':'close'}" data-id="${e.id||''}">Болих</button><button class="btn btn-primary" type="submit">Хадгалах</button></div></form>`;
 }
@@ -778,46 +970,274 @@ function parseCSV(text){
   return rows.map(r => r.map(x => x.trim())).filter(r => r.some(Boolean));
 }
 const csvCell = v => { v = String(v ?? ''); return /[",\n;]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
-async function importEmps(text){
-  const rows = parseCSV(text).slice(1); let add = 0, upd = 0; const errs = [];
-  const byName = new Map(S.depts.map(d => [d.name.toLowerCase(), d]));
-  const newDepts = [...new Set(rows.map(r => r[2]).filter(n => n && !byName.has(n.toLowerCase())))];
-  if(newDepts.length){ const made = await dbInsert('departments', newDepts.map((n,i) => ({ name:n, sort:S.depts.length+i+1 }))); made.forEach(d => byName.set(d.name.toLowerCase(), d)); }
-  const byCode = new Map(S.emps.filter(e => e.emp_code).map(e => [e.emp_code.toLowerCase(), e]));
-  const inserts = [];
-  for(const [i, r] of rows.entries()){
-    const [code, name, dept, pos, email, phone] = r;
-    if(!name){ errs.push(`${i+2}-р мөр: нэр хоосон`); continue; }
-    const row = { emp_code:code||null, full_name:name, department_id: dept ? byName.get(dept.toLowerCase())?.id ?? null : null, position:pos||null, email:email||null, phone:phone||null };
-    const ex = code && byCode.get(code.toLowerCase());
-    if(ex){ await dbUpdate('employees', ex.id, row); upd++; } else { inserts.push({ ...row, active:true }); }
+/* ---------- Excel / CSV импорт (сургалтын матриц) ---------- */
+let XLSX_P = null;
+function loadXLSX(){
+  if(window.XLSX) return Promise.resolve(window.XLSX);
+  return XLSX_P ||= new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    sc.onload = () => res(window.XLSX); sc.onerror = () => { XLSX_P = null; rej(new Error('Excel уншигч ачаалагдсангүй. Интернэт холболтоо шалгана уу.')); }; document.head.appendChild(sc); });
+}
+async function readSheets(file){
+  if(/\.(csv|txt|tsv)$/i.test(file.name)) return [{ name:file.name, rows:parseCSV(await file.text()) }];
+  const X = await loadXLSX(); const wb = X.read(await file.arrayBuffer(), { type:'array' });
+  return wb.SheetNames.map(n => ({ name:n, rows:X.utils.sheet_to_json(wb.Sheets[n], { header:1, raw:true, defval:'', blankrows:false }) })).filter(x => x.rows.length);
+}
+const cellStr = v => String(v ?? '').replace(/\s+/g, ' ').trim();
+const normKey = v => cellStr(v).toLowerCase().replace(/[\s.\-_/\\()№#:,'"]+/g, '');
+const pad2 = n => String(n).padStart(2, '0');
+function validYmd(y, m, d){ y = +y; m = +m; d = +d; if(y < 1990 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) return null; const t = new Date(y, m-1, d); if(t.getMonth() !== m-1) return null; return `${y}-${pad2(m)}-${pad2(d)}`; }
+function cellDate(v){
+  if(v == null || v === '') return null;
+  if(typeof v === 'number'){ if(v < 20000 || v > 80000) return null; const d = new Date(Math.round((v - 25569) * 86400000)); return validYmd(d.getUTCFullYear(), d.getUTCMonth()+1, d.getUTCDate()); }
+  if(v instanceof Date) return validYmd(v.getFullYear(), v.getMonth()+1, v.getDate());
+  const s = cellStr(v).replace(/\s+\d{1,2}:\d{2}(:\d{2})?$/, '').replace(/\s*(он|оны)\s*/g, '.').replace(/\.$/, '');
+  let m = s.match(/^(\d{4})[.\-\/ ](\d{1,2})[.\-\/ ](\d{1,2})$/); if(m) return validYmd(m[1], m[2], m[3]);
+  m = s.match(/^(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{2}|\d{4})$/);
+  if(m){ let [, a, b, y] = m; if(y.length === 2) y = '20' + y; if(+b > 12 && +a <= 12) [a, b] = [b, a]; return validYmd(y, b, a); }
+  if(/^\d{5}$/.test(s)) return cellDate(Number(s));
+  return null;
+}
+const HDR = {
+  skip: /^(№|#|д\/?д|дд|no\.?|s\/?n|sn|д\.д\.?)$/i,
+  code: /^((ажилтны|таб(ель)?(ийн)?|бүртгэлийн)\s*)?(код|дугаар|№)$|^(emp(loyee)?\s*)?(id|code|no\.?)$|^таб(ель)?$/i,
+  name: /овог.*нэр|^нэр$|^нэрс$|ажилтны\s*нэр|^(full\s*)?name$|employee\s*name/i,
+  last: /^(овог|last\s*name|surname|family\s*name)$/i,
+  dept: /^(алба(\s*нэгж)?|хэлтэс|нэгж|баг|dep(t|artment)|team|division|section)$/i,
+  pos:  /албан\s*тушаал|^position$|job\s*title|^title$|^мэргэжил$|designation/i,
+  email:/имэйл|и-?мэйл|e-?mail|цахим\s*шуудан/i,
+  phone:/утас|phone|mobile/i,
+  hired:/ажилд\s*орсон|hire\s*date|start\s*date|date\s*joined/i,
+  mgr:  /^(шууд\s*)?удирдлага(ын\s*нэр)?$|^(line\s*)?manager$|^supervisor$|reports?\s*to/i,
+  ttype:/^(сургалт(ын\s*(нэр|төрөл))?|training(\s*(name|type))?|course)$/i,
+  done: /хамрагдсан|completed?|completion|сургалтад\s*орсон|^огноо$|^date$|issued?/i,
+  exp:  /дуусах|хүчинтэй|expir|valid\s*(until|to|till)|due\s*date|^due$/i,
+  cert: /гэрчилгээ|certificate|cert\b|үнэмлэх/i,
+  prov: /байгууллага|provider|trainer|сургагч|зохион/i,
+  note: /тайлбар|тэмдэглэл|note|remark|comment/i
+};
+const EMP_KEYS = ['code','name','last','dept','pos','email','phone','hired','mgr'];
+const stripKind = h => cellStr(h).replace(/[\s\-–—(]*(дуусах|хүчинтэй|хамрагдсан|expiry|expiration|completed|valid\s*until)(\s*(огноо|хугацаа|date))?[)\s]*$/i, '').trim();
+
+const isSection = t => S.depts.some(d => normKey(d.name) === normKey(t) || normKey(t).startsWith(normKey(d.name)) && normKey(d.name).length >= 2) || /алба|хэлтэс|нэгж|\bбаг\b|team|department|division/i.test(t) || /^[A-Z][A-Z&\/ ]{1,14}$/.test(t);
+function parseMatrix(rows){
+  const W = Math.max(...rows.slice(0, 60).map(r => r.length));
+  // 1. гарчгийн мөр
+  let hi = -1, best = -1;
+  for(let r = 0; r < Math.min(rows.length, 25); r++){
+    const cells = rows[r].map(cellStr); let score = 0, key = false;
+    cells.forEach(c => { if(!c) return; score++; if(HDR.name.test(c) || HDR.code.test(c) || HDR.last.test(c)){ score += 5; key = true; } else if(HDR.dept.test(c) || HDR.pos.test(c)) score += 2; });
+    if(key && score > best){ best = score; hi = r; }
   }
-  if(inserts.length){ await dbInsert('employees', inserts); add = inserts.length; }
-  return { add, upd, errs };
-}
-async function importTrs(text){
-  const rows = parseCSV(text).slice(1); const errs = [];
-  const byCode = new Map(S.emps.filter(e => e.emp_code).map(e => [e.emp_code.toLowerCase(), e]));
-  const byType = new Map(S.types.map(t => [t.name.toLowerCase(), t]));
-  const newTypes = [...new Set(rows.map(r => r[1]).filter(n => n && !byType.has(n.toLowerCase())))];
-  if(newTypes.length){ const made = await dbInsert('training_types', newTypes.map(n => ({ name:n, validity_months:12 }))); made.forEach(t => byType.set(t.name.toLowerCase(), t)); }
-  const ins = [];
-  for(const [i, r] of rows.entries()){
-    const [code, tname, date, cert, prov] = r; const ln = i+2;
-    const e = code && byCode.get(code.toLowerCase()); if(!e){ errs.push(`${ln}-р мөр: "${code}" кодтой ажилтан алга`); continue; }
-    const t = tname && byType.get(tname.toLowerCase()); if(!t){ errs.push(`${ln}-р мөр: сургалтын нэр хоосон`); continue; }
-    const d = normDate(date); if(!d){ errs.push(`${ln}-р мөр: огноо "${date}" буруу`); continue; }
-    ins.push({ employee_id:e.id, training_type_id:t.id, completed_on:d, expires_on:addMonths(d, t.validity_months), certificate_no:cert||null, provider:prov||null });
+  if(hi < 0) throw new Error('Гарчгийн мөр олдсонгүй. Файлд "Овог нэр" эсвэл "Код" гэсэн багана байх ёстой.');
+  const head = Array.from({ length:W }, (_, c) => cellStr(rows[hi][c]));
+  const nextRow = Array.from({ length:W }, (_, c) => cellStr(rows[hi+1]?.[c]));
+  const subMode = nextRow.filter(c => c && (HDR.done.test(c) || HDR.exp.test(c))).length >= 2;
+  const sub = subMode ? nextRow : head.map(() => '');
+  // 2. ажилтны баганууд
+  const col = {}; const used = new Set();
+  head.forEach((h, c) => { if(!h || HDR.skip.test(h)) { if(h) used.add(c); return; }
+    for(const k of EMP_KEYS){ if(col[k] == null && HDR[k].test(h) && !(k === 'name' && HDR.last.test(h))){ col[k] = c; used.add(c); break; } } });
+  if(col.name == null && col.last != null){ col.name = col.last; delete col.last; }
+  // жагсаалт хэлбэр (нэг мөр = нэг сургалт)?
+  const longCols = {}; head.forEach((h, c) => { if(used.has(c) || !h) return; for(const k of ['ttype','done','exp','cert','prov','note']) if(longCols[k] == null && HDR[k].test(h)){ longCols[k] = c; break; } });
+  const isLong = longCols.ttype != null && (longCols.done != null || longCols.exp != null);
+  const start = hi + (subMode ? 2 : 1), data = rows.slice(start);
+  const lineNo = i => start + i + 1;
+  // 3. сургалтын баганууд (матриц)
+  const groups = new Map(), skipped = [];
+  if(!isLong){
+    let lastName = '';
+    for(let c = 0; c < W; c++){
+      if(used.has(c)) continue;
+      let name = head[c]; if(subMode && !name) name = lastName; if(head[c]) lastName = head[c];
+      if(!name) continue;
+      let kind = 'date';
+      const sh = sub[c];
+      if(subMode && sh){ kind = HDR.exp.test(sh) ? 'exp' : HDR.done.test(sh) ? 'done' : HDR.cert.test(sh) ? 'cert' : HDR.prov.test(sh) ? 'prov' : 'date'; }
+      else if(!subMode){ if(HDR.exp.test(name) && stripKind(name) !== name){ kind = 'exp'; name = stripKind(name); } else if(HDR.done.test(name) && stripKind(name) !== name){ kind = 'done'; name = stripKind(name); } }
+      if(kind === 'date' || kind === 'exp' || kind === 'done'){
+        const n = data.filter(r => cellDate(r[c])).length;
+        if(!n){ skipped.push(head[c] || name); continue; }
+      }
+      const key = normKey(name); if(!groups.has(key)) groups.set(key, { name, cols:{} });
+      const g = groups.get(key); if(g.cols[kind] == null) g.cols[kind] = c;
+    }
+    [...groups].forEach(([k, g]) => { if(g.cols.date == null && g.cols.done == null && g.cols.exp == null) groups.delete(k); });
   }
-  if(ins.length) await dbInsert('trainings', ins);
-  return { add:ins.length, upd:0, errs, newTypes };
+  // 4. мөрүүд
+  const emps = [], recs = [], errors = []; let section = '';
+  data.forEach((r, i) => {
+    const get = k => col[k] != null ? r[col[k]] : '';
+    const filled = r.filter(v => cellStr(v)).length;
+    let name = cellStr(get('name')); const code = cellStr(get('code'));
+    if(col.last != null && name && cellStr(get('last'))) name = cellStr(get('last'))[0] + '.' + name;
+    if(filled === 1 && !code){ const t = cellStr(r.find(v => cellStr(v))); if(isSection(t)){ section = t; return; } } // "BP алба" гэх мэт бүлгийн гарчиг
+    if(!name && !code) return;
+    const hired = cellDate(get('hired'));
+    const ei = emps.push({ line:lineNo(i), code, name, dept:cellStr(get('dept')) || section, pos:cellStr(get('pos')), email:cellStr(get('email')), phone:cellStr(get('phone')), hired, mgr:cellStr(get('mgr')) }) - 1;
+    if(isLong){
+      const t = cellStr(r[longCols.ttype]); if(!t) return;
+      const done = longCols.done != null ? cellDate(r[longCols.done]) : null, exp = longCols.exp != null ? cellDate(r[longCols.exp]) : null;
+      if(!done && !exp){ errors.push(`${lineNo(i)}-р мөр: "${t}" огноо танигдсангүй`); return; }
+      recs.push({ emp:ei, line:lineNo(i), type:t, done, exp, date:null, cert:cellStr(r[longCols.cert]), prov:cellStr(r[longCols.prov]) });
+    } else for(const g of groups.values()){
+      const c = g.cols; const done = c.done != null ? cellDate(r[c.done]) : null, exp = c.exp != null ? cellDate(r[c.exp]) : null, date = c.date != null ? cellDate(r[c.date]) : null;
+      if(!done && !exp && !date) continue;
+      recs.push({ emp:ei, line:lineNo(i), type:g.name, done, exp, date, cert:c.cert != null ? cellStr(r[c.cert]) : '', prov:c.prov != null ? cellStr(r[c.prov]) : '' });
+    }
+  });
+  const dateVals = recs.filter(x => x.date).map(x => x.date), today = todayStr();
+  const guess = dateVals.length && dateVals.filter(d => d > today).length / dateVals.length > .5 ? 'exp' : 'done';
+  const found = Object.keys(col).map(k => ({ code:'Код', name:'Овог нэр', last:'Овог', dept:'Алба', pos:'Албан тушаал', email:'Имэйл', phone:'Утас', hired:'Ажилд орсон', mgr:'Удирдлага' })[k]);
+  return { headerLine:hi+1, subMode, isLong, found, groups:[...groups.values()].map(g => g.name), skipped, emps, recs, errors, hasAmbig:dateVals.length > 0, guess, sections: !col.dept && emps.some(e => e.dept) };
 }
-function showImportResult(kind, r){
-  openModal({ title:'Импортын үр дүн', body:`<p style="margin:0">${kind==='emps'?`<b>${r.add}</b> ажилтан нэмэгдэж, <b>${r.upd}</b> шинэчлэгдлээ.`:`<b>${r.add}</b> сургалтын бичлэг нэмэгдлээ.`}</p>
-    ${r.newTypes?.length ? `<p class="note">Шинэ сургалтын төрөл үүссэн (12 сар гэж тооцсон, Тохиргооноос засна): ${esc(r.newTypes.join(', '))}</p>` : ''}
-    ${r.errs.length ? `<div><b style="color:var(--bad)">${r.errs.length} мөр алгассан:</b><pre class="code" style="margin-top:6px;max-height:200px;overflow:auto">${esc(r.errs.join('\n'))}</pre></div>` : ''}
-    <div class="m-foot"><button class="btn btn-primary" data-act="close">Болсон</button></div>` });
+
+const nameKeys = n => { const k = [normKey(n)]; const w = cellStr(n).split(' '); if(w.length === 2 && !/\./.test(n)) k.push(normKey(w[0][0] + w[1]), normKey(w[1][0] + w[0])); return k; };
+function matchDept(name, map){ if(!name) return null; const k = normKey(name); if(map.has(k)) return map.get(k); for(const [dk, d] of map) if(k.startsWith(dk) && dk.length >= 2) return d; return null; }
+
+function planImport(P, opt){
+  const deptMap = new Map(S.depts.map(d => [normKey(d.name), d]));
+  const byCode = new Map(S.emps.filter(e => e.emp_code).map(e => [normKey(e.emp_code), e]));
+  const byName = new Map(); S.emps.forEach(e => nameKeys(e.full_name).forEach(k => { if(!byName.has(k)) byName.set(k, []); byName.get(k).push(e); }));
+  const typeMap = new Map(S.types.map(t => [normKey(t.name), t]));
+  const out = { empNew:[], empUpd:[], empSame:0, recNew:[], recSame:0, recOld:0, newTypes:[], newDepts:[], errors:[...P.errors], resolved:[] };
+  const newKeys = new Map();
+  P.emps.forEach((r, i) => {
+    let e = r.code && byCode.get(normKey(r.code));
+    if(!e){ let c = []; for(const k of nameKeys(r.name)){ c = byName.get(k) || []; if(c.length) break; }
+      if(c.length > 1){ const d = matchDept(r.dept, deptMap); const cc = d ? c.filter(x => x.department_id === d.id) : []; if(cc.length === 1) c = cc; }
+      if(c.length > 1){ out.errors.push(`${r.line}-р мөр: "${r.name}" нэртэй ${c.length} ажилтан байна — "Код" багана нэмбэл ялгана`); out.resolved[i] = 'skip'; return; }
+      e = c[0]; }
+    if(e){
+      out.resolved[i] = e;
+      const d = matchDept(r.dept, deptMap), patch = {};
+      if(r.dept && !d && !out.newDepts.includes(r.dept)) out.newDepts.push(r.dept);
+      if(d && d.id !== e.department_id) patch.department_id = d.id;
+      if(r.dept && !d) patch._dept = r.dept;
+      if(r.pos && r.pos !== (e.position||'')) patch.position = r.pos;
+      if(r.email && r.email.toLowerCase() !== (e.email||'').toLowerCase()) patch.email = r.email;
+      if(r.phone && String(r.phone) !== String(e.phone||'')) patch.phone = String(r.phone);
+      if(r.hired && r.hired !== e.hired_on) patch.hired_on = r.hired;
+      if(r.code && !e.emp_code) patch.emp_code = r.code;
+      if(Object.keys(patch).length) out.empUpd.push({ e, patch, row:r }); else out.empSame++;
+    } else if(!r.name){ out.errors.push(`${r.line}-р мөр: "${r.code}" кодтой ажилтан системд алга, нэр нь хоосон`); out.resolved[i] = 'skip'; }
+    else if(!opt.addNew){ out.errors.push(`${r.line}-р мөр: "${r.name}" системд алга (алгаслаа)`); out.resolved[i] = 'skip'; }
+    else {
+      const k = r.code ? 'c:' + normKey(r.code) : 'n:' + normKey(r.name);
+      if(newKeys.has(k)){ out.resolved[i] = newKeys.get(k); return; }
+      if(r.dept && !matchDept(r.dept, deptMap) && !out.newDepts.includes(r.dept)) out.newDepts.push(r.dept);
+      const ne = { _new:true, row:r }; out.empNew.push(ne); newKeys.set(k, ne); out.resolved[i] = ne;
+    }
+  });
+  const seen = new Set();
+  for(const x of P.recs){
+    const who = out.resolved[x.emp]; if(!who || who === 'skip') continue;
+    const tk = normKey(x.type); let t = typeMap.get(tk);
+    if(!t){ let nt = out.newTypes.find(n => normKey(n.name) === tk); if(!nt){ nt = { name:x.type, months:opt.months[tk] || 12 }; out.newTypes.push(nt); } t = { _new:true, name:nt.name, validity_months:nt.months }; }
+    const m = t.validity_months;
+    let done = x.done, exp = x.exp;
+    if(x.date && !done && !exp){ if(opt.mode === 'exp') exp = x.date; else done = x.date; }
+    if(done && !exp) exp = addMonths(done, m); if(exp && !done) done = addMonths(exp, -m);
+    if(exp < done){ out.errors.push(`${x.line}-р мөр: "${x.type}" дуусах огноо хамрагдсанаас өмнө байна`); continue; }
+    const dk = (who._new ? 'n' + out.empNew.indexOf(who) : who.id) + '|' + tk + '|' + done;
+    if(seen.has(dk)) continue; seen.add(dk);
+    if(!who._new && !t._new){
+      const ex = S.trs.filter(r => r.employee_id === who.id && r.training_type_id === t.id);
+      if(ex.some(r => r.completed_on === done || r.expires_on === exp)){ out.recSame++; continue; }
+      const cur = ex.reduce((a, r) => !a || r.expires_on > a.expires_on ? r : a, null);
+      if(cur && cur.expires_on > exp){ out.recOld++; continue; }
+    }
+    out.recNew.push({ who, t, tk, done, exp, cert:x.cert || null, prov:x.prov || null });
+  }
+  out.mgrLinks = P.emps.map((r, i) => r.mgr && out.resolved[i] && out.resolved[i] !== 'skip' ? { who:out.resolved[i], mgr:r.mgr } : null).filter(Boolean);
+  return out;
 }
+
+async function startImport(file){
+  if(!file) return;
+  if(file.size > 15 * 1024 * 1024) return toast('Файл хэт том байна (15 MB-аас бага байх ёстой)', 'bad');
+  openModal({ title:'Файл уншиж байна', body:'<div style="display:grid;place-items:center;padding:24px"><div class="spinner"></div></div>' });
+  try{
+    const sheets = await readSheets(file);
+    if(!sheets.length) throw new Error('Файл хоосон байна');
+    // гарчиг олдох хамгийн их мөртэй sheet-ийг сонгоно
+    let si = 0, bestN = -1;
+    sheets.forEach((sh, i) => { try{ const P = parseMatrix(sh.rows); const n = P.recs.length * 2 + P.emps.length; if(n > bestN){ bestN = n; si = i; } } catch{} });
+    S.imp = { file:file.name, sheets, si, mode:null, months:{}, addNew:true };
+    parseCurrent(); renderImport();
+  } catch(e){ console.error(e); closeModal(); toast(e.message || String(e), 'bad'); }
+}
+function parseCurrent(){
+  const im = S.imp; im.err = null;
+  try{ im.P = parseMatrix(im.sheets[im.si].rows); if(!im.mode) im.mode = im.P.guess; }
+  catch(e){ im.P = null; im.err = e.message; }
+}
+function renderImport(){
+  const im = S.imp; if(!im) return;
+  const P = im.P, pl = P ? planImport(P, im) : null;
+  im.plan = pl;
+  const sheetSel = im.sheets.length > 1 ? `<div class="field"><label for="imp-sheet">Хуудас (sheet)</label><select class="inp" id="imp-sheet" data-imp="sheet">${im.sheets.map((s, i) => `<option value="${i}" ${i === im.si ? 'selected' : ''}>${esc(s.name)} (${s.rows.length} мөр)</option>`).join('')}</select></div>` : '';
+  let body;
+  if(!P) body = `${sheetSel}<p style="margin:0;color:var(--bad)">${esc(im.err)}</p><div class="m-foot"><button class="btn" data-act="close">Хаах</button></div>`;
+  else body = `${sheetSel}
+    <div class="imp-sum">
+      <div><b>${pl.recNew.length}</b><span>Шинэ сургалтын бичлэг</span></div>
+      <div><b>${pl.recSame + pl.recOld}</b><span>Өөрчлөлтгүй (алгасна)</span></div>
+      <div><b>${pl.empNew.length}</b><span>Шинэ ажилтан</span></div>
+      <div><b>${pl.empUpd.length}</b><span>Мэдээлэл шинэчлэгдэх</span></div>
+    </div>
+    <dl class="kv" style="margin:0"><dt>Гарчиг</dt><dd>${P.headerLine}-р мөр${P.subMode ? ' (2 мөр гарчигтай)' : ''} · ${P.emps.length} ажилтны мөр</dd>
+      <dt>Ажилтны багана</dt><dd>${P.found.map(f => `<span class="chip chip-plain">${f}</span>`).join(' ')}${P.sections ? ' <span class="chip chip-plain">Алба (бүлгийн гарчгаас)</span>' : ''}</dd>
+      <dt>Сургалт</dt><dd>${P.isLong ? 'Жагсаалт хэлбэр (мөр бүр нэг сургалт)' : P.groups.length ? P.groups.map(g => `<span class="chip ${pl.newTypes.some(n => normKey(n.name) === normKey(g)) ? 'chip-warn' : 'chip-plain'}">${esc(g)}</span>`).join(' ') : '<span class="muted">Сургалтын багана олдсонгүй — зөвхөн ажилтны мэдээлэл шинэчлэгдэнэ</span>'}</dd>
+      ${P.skipped.length ? `<dt>Алгассан</dt><dd class="muted">${P.skipped.map(esc).join(', ')} <span class="faint">(огноо агуулаагүй)</span></dd>` : ''}</dl>
+    ${P.hasAmbig ? `<div class="field"><span class="lbl-s">Нүдэнд бичигдсэн огноо нь</span><div class="toolbar">
+      <label class="check"><input type="radio" name="imp-mode" value="done" data-imp="mode" ${im.mode === 'done' ? 'checked' : ''}>Хамрагдсан огноо</label>
+      <label class="check"><input type="radio" name="imp-mode" value="exp" data-imp="mode" ${im.mode === 'exp' ? 'checked' : ''}>Дуусах (хүчинтэй) огноо</label>
+      ${im.mode === P.guess ? '<span class="note">· огноонуудаас автоматаар таамагласан</span>' : ''}</div></div>` : ''}
+    ${pl.newTypes.length ? `<div class="field"><span class="lbl-s">Шинэ сургалтын төрөл — хүчинтэй хугацаа (сар)</span>${pl.newTypes.map(n => `<div class="set-row two"><span>${esc(n.name)}</span><input class="inp mono" type="number" min="1" style="width:90px" value="${n.months}" data-imp="months" data-k="${esc(normKey(n.name))}" aria-label="${esc(n.name)} сар"></div>`).join('')}</div>` : ''}
+    ${pl.newDepts.length ? `<p class="note">Шинэ алба үүснэ: ${pl.newDepts.map(esc).join(', ')}</p>` : ''}
+    <label class="check"><input type="checkbox" data-imp="addNew" ${im.addNew ? 'checked' : ''}>Системд байхгүй ажилтныг шинээр нэмэх</label>
+    ${pl.errors.length ? `<details class="hist"><summary style="color:var(--bad)">${pl.errors.length} анхааруулга</summary><pre class="code" style="margin-top:6px;max-height:180px;overflow:auto;white-space:pre-wrap">${esc(pl.errors.join('\n'))}</pre></details>` : ''}
+    <div class="m-foot"><button class="btn" data-act="close">Болих</button><button class="btn btn-primary" data-act="imp-apply" ${pl.recNew.length + pl.empNew.length + pl.empUpd.length + pl.mgrLinks.length ? '' : 'disabled'}>Оруулах</button></div>`;
+  openModal({ title:`Импорт · ${im.file}`, wide:true, body });
+}
+async function applyImport(){
+  const im = S.imp, pl = im.plan; if(!pl) return;
+  // 1. алба
+  const deptMap = new Map(S.depts.map(d => [normKey(d.name), d]));
+  if(pl.newDepts.length){ const made = await dbInsert('departments', pl.newDepts.map((n, i) => ({ name:n, sort:S.depts.length + i + 1 }))); made.forEach(d => deptMap.set(normKey(d.name), d)); }
+  const deptId = n => matchDept(n, deptMap)?.id ?? null;
+  // 2. сургалтын төрөл
+  const typeMap = new Map(S.types.map(t => [normKey(t.name), t]));
+  if(pl.newTypes.length){ const made = await dbInsert('training_types', pl.newTypes.map(n => ({ name:n.name, validity_months:Math.max(1, Number(n.months) || 12) }))); made.forEach(t => typeMap.set(normKey(t.name), t)); }
+  // 3. шинэ ажилтан
+  if(pl.empNew.length){
+    const made = await dbInsert('employees', pl.empNew.map(({ row:r }) => ({ emp_code:r.code || null, full_name:r.name, department_id:deptId(r.dept), position:r.pos || null, email:r.email || null, phone:r.phone ? String(r.phone) : null, hired_on:r.hired || null, active:true })));
+    made.forEach((e, i) => pl.empNew[i].id = e.id);
+  }
+  // 4. мэдээлэл шинэчлэх
+  for(const u of pl.empUpd){ const p = { ...u.patch }; if(p._dept){ p.department_id = deptId(p._dept); delete p._dept; } if(Object.keys(p).length) await dbUpdate('employees', u.e.id, p); }
+  // 5. удирдлагын холбоос
+  let links = 0;
+  if(pl.mgrLinks.length){
+    const byCode = new Map(S.emps.filter(e => e.emp_code).map(e => [normKey(e.emp_code), e]));
+    const byName = new Map(); S.emps.forEach(e => nameKeys(e.full_name).forEach(k => { if(!byName.has(k)) byName.set(k, []); byName.get(k).push(e); }));
+    for(const l of pl.mgrLinks){
+      const id = l.who._new ? l.who.id : l.who.id; let m = byCode.get(normKey(l.mgr));
+      if(!m){ for(const k of nameKeys(l.mgr)){ const c = byName.get(k) || []; if(c.length === 1){ m = c[0]; break; } } }
+      const me = IDX.emp.get(id);
+      if(m && me && m.id !== id && me.manager_id !== m.id && !isUnder(m.id, id)){ await dbUpdate('employees', id, { manager_id:m.id }); links++; }
+    }
+  }
+  // 6. сургалтын бичлэг
+  const rows = pl.recNew.map(r => ({ employee_id:r.who.id, training_type_id:typeMap.get(r.tk).id, completed_on:r.done, expires_on:r.exp, certificate_no:r.cert, provider:r.prov }));
+  if(rows.length) await dbInsert('trainings', rows);
+  const summary = { at:new Date().toISOString(), file:im.file, trainings:rows.length, new_emps:pl.empNew.length, updated:pl.empUpd.length, links };
+  try{ await saveSettings({ last_import:summary }); } catch(e){ console.warn(e); S.settings.last_import = summary; }
+  return summary;
+}
+const lastImportText = () => { const l = S.settings.last_import; if(!l) return ''; return `Сүүлд шинэчилсэн: ${fmtDate(String(l.at).slice(0,10))} · ${esc(l.file)} · +${l.trainings} бичлэг`; };
+const importBtn = (label = 'Excel оруулах', cls = 'btn') => `<label class="${cls}" style="cursor:pointer">${label}<input type="file" accept=".xlsx,.xls,.xlsm,.csv,.txt" data-import="file" hidden></label>`;
 function exportCSV(){
   const head = ['Код','Овог нэр','Алба','Албан тушаал','Имэйл','Сургалт','Хамрагдсан','Дуусах','Үлдсэн хоног','Төлөв','Гэрчилгээ №','Байгууллага'];
   const rows = filteredTrs().map(c => { const e = IDX.emp.get(c.employee_id); return [e.emp_code, e.full_name, deptName(e.department_id), e.position, e.email, typeName(c.training_type_id), c.completed_on, c.expires_on, c.days, ST[c.status], c.certificate_no, c.provider]; });
@@ -829,15 +1249,17 @@ function exportCSV(){
 
 /* ---------- events ---------- */
 const ACT = {
-  nav: a => { S.view = a.dataset.v; render(); window.scrollTo(0,0); },
-  'goto-trs': a => { S.tf = { q:'', dept:'', type:'', status:a.dataset.st||'' }; if(!a.dataset.st){ S.view='emps'; S.ef={q:'',dept:'',status:'none',inactive:false}; } else S.view = 'trs'; render(); window.scrollTo(0,0); },
+  nav: a => { S.view = a.dataset.v; if(S.view === 'org') S.org = null; render(); window.scrollTo(0,0); },
+  'goto-trs': a => { const st = a.dataset.st||'', dept = a.dataset.dept||''; if(!st || st === 'none'){ S.view = 'emps'; S.ef = { q:'', dept, status:'none', inactive:false }; } else { S.view = 'trs'; S.tf = { q:'', dept, type:'', status:st }; } render(); window.scrollTo(0,0); },
+  'goto-org': a => { S.view = 'org'; S.org = a.dataset.dept ? Number(a.dataset.dept) : null; render(); window.scrollTo(0,0); },
+  'org-back': () => { S.org = null; render(); window.scrollTo(0,0); },
   'goto-emps': a => { S.ef = { q:'', dept:a.dataset.dept, status:'', inactive:false }; S.view = 'emps'; render(); window.scrollTo(0,0); },
   'goto-import': () => { S.view = 'settings'; render(); $('#import')?.scrollIntoView(); },
   ovl: (a, ev) => { if(ev.target === a) closeModal(); },
   close: () => closeModal(),
   profile: a => openProfile(Number(a.dataset.id)),
   'back-profile': a => backToProfile(a.dataset.id),
-  'new-emp': () => { S.openEmp = null; openModal({ title:'Шинэ ажилтан', body:empForm(null) }); },
+  'new-emp': a => { S.openEmp = null; openModal({ title:'Шинэ ажилтан', body:empForm(null, a.dataset.dept ? Number(a.dataset.dept) : undefined) }); },
   'edit-emp': a => { const e = IDX.emp.get(Number(a.dataset.id)); S.openEmp = null; openModal({ title:'Мэдээлэл засах', body:empForm(e) }); },
   'del-emp': async a => { const e = IDX.emp.get(Number(a.dataset.id)); if(!await askConfirm(`${e.full_name}-г бүх сургалтын хамт устгах уу? Ажлаас гарсан бол "Идэвхтэй" тэмдгийг арилгавал түүх хадгалагдана.`)) return; await run(async () => { await dbDelete('employees', e.id); closeModal(); render(); }, 'Ажилтан устгагдлаа'); },
   'new-tr': a => { const id = Number(a.dataset.emp); if(!S.types.length) return toast('Эхлээд Тохиргоо хэсэгт сургалтын төрөл нэмнэ үү','bad'); S.openEmp = null; openModal({ title:'Сургалт нэмэх', body:trForm({ employee_id:id }) }); },
@@ -853,6 +1275,10 @@ const ACT = {
   'send-now': async a => { a.disabled = true; const n = await run(sendNow, n => DEMO ? `Демо: ${n} имэйл илгээгдэх байсан` : `${n} сануулга илгээлээ`); a.disabled = false; if(n != null) render(); },
   'del-dept': async a => { const d = IDX.dept.get(Number(a.dataset.id)); const c = S.emps.filter(e => e.department_id === d.id).length; if(!await askConfirm(`"${d.name}" албыг устгах уу?${c?` ${c} ажилтан албагүй болно.`:''}`)) return; await run(async () => { await dbDelete('departments', d.id); render(); }, 'Алба устгагдлаа'); },
   'del-type': async a => { const t = IDX.type.get(Number(a.dataset.id)); const c = S.trs.filter(x => x.training_type_id === t.id).length; if(!await askConfirm(`"${t.name}"-г устгах уу?${c?` Үүнтэй холбоотой ${c} бичлэг мөн устна.`:''}`)) return; await run(async () => { await dbDelete('training_types', t.id); render(); }, 'Устгагдлаа'); },
+  'imp-apply': async a => { a.disabled = true; a.textContent = 'Оруулж байна…';
+    const r = await run(applyImport); if(!r){ a.disabled = false; a.textContent = 'Оруулах'; return; }
+    S.imp = null; closeModal(); render();
+    openModal({ title:'Импорт амжилттай', body:`<p style="margin:0"><b>${r.trainings}</b> сургалтын бичлэг нэмэгдэж, <b>${r.new_emps}</b> шинэ ажилтан, <b>${r.updated}</b> ажилтны мэдээлэл шинэчлэгдлээ${r.links ? `, <b>${r.links}</b> удирдлагын холбоос тохирууллаа` : ''}.</p>${DEMO ? '<p class="note">Демо горим: хуудсыг дахин ачаалахад өөрчлөлт арилна.</p>' : ''}<div class="m-foot"><button class="btn btn-primary" data-act="close">Болсон</button></div>` }); },
   logout: async () => { await sb.auth.signOut(); S.ready = false; S.auth = 'login'; render(); }
 };
 document.addEventListener('click', ev => { const a = ev.target.closest('[data-act]'); if(!a) return; const f = ACT[a.dataset.act]; if(f){ if(a.tagName === 'A') ev.preventDefault(); f(a, ev); } });
@@ -860,6 +1286,9 @@ document.addEventListener('keydown', ev => {
   if(ev.key === 'Escape' && $('#modal-root').innerHTML && !$('#confirm-root').innerHTML) closeModal();
   if(ev.key === 'Enter' && ev.target.matches('.drow')) ev.target.click();
 });
+document.addEventListener('dragover', ev => { const z = ev.target.closest?.('[data-drop]'); if(!z) return; ev.preventDefault(); z.classList.add('over'); });
+document.addEventListener('dragleave', ev => { const z = ev.target.closest?.('[data-drop]'); if(z && !z.contains(ev.relatedTarget)) z.classList.remove('over'); });
+document.addEventListener('drop', ev => { const z = ev.target.closest?.('[data-drop]'); if(!z) return; ev.preventDefault(); z.classList.remove('over'); const f = ev.dataTransfer.files[0]; if(f) startImport(f); });
 function updBulkCount(){ const n = $$('.pick-list input:checked').length; const c = $('#b-count'); if(c) c.textContent = `${n} сонгосон`; }
 document.addEventListener('input', ev => {
   const t = ev.target;
@@ -874,7 +1303,15 @@ document.addEventListener('input', ev => {
 document.addEventListener('change', async ev => {
   const t = ev.target;
   if(t.dataset.photo && t.files[0]){ const id = Number(t.dataset.photo); await run(async () => { await uploadPhoto(id, t.files[0]); refresh(); }, 'Зураг хадгалагдлаа'); }
-  if(t.dataset.import && t.files[0]){ const kind = t.dataset.import; const text = await t.files[0].text(); t.value = ''; const r = await run(() => kind === 'emps' ? importEmps(text) : importTrs(text)); if(r){ render(); showImportResult(kind, r); } }
+  if(t.dataset.import && t.files[0]){ const f = t.files[0]; t.value = ''; startImport(f); }
+  if(t.dataset.imp && S.imp){
+    const k = t.dataset.imp;
+    if(k === 'sheet'){ S.imp.si = Number(t.value); S.imp.mode = null; parseCurrent(); }
+    if(k === 'mode') S.imp.mode = t.value;
+    if(k === 'addNew') S.imp.addNew = t.checked;
+    if(k === 'months'){ const v = Number(t.value); if(v > 0) S.imp.months[t.dataset.k] = v; }
+    renderImport();
+  }
   if(t.dataset.edit){
     const id = Number(t.dataset.id), v = t.value.trim();
     if(t.dataset.edit === 'dept' && v) await run(async () => { await dbUpdate('departments', id, { name:v }); }, 'Хадгалагдлаа');
@@ -888,7 +1325,9 @@ const FORMS = {
     btn.disabled = false; if(error) return toast('Имэйл эсвэл нууц үг буруу байна','bad'); S.user = data.user; await start(); },
   emp: async f => {
     const id = num(f.id.value);
-    const row = { emp_code:f.emp_code.value.trim()||null, full_name:f.full_name.value.trim(), department_id:num(f.department_id.value), position:f.position.value.trim()||null, email:f.email.value.trim()||null, phone:f.phone.value.trim()||null, active:f.active.checked };
+    const row = { emp_code:f.emp_code.value.trim()||null, full_name:f.full_name.value.trim(), department_id:num(f.department_id.value), position:f.position.value.trim()||null, email:f.email.value.trim()||null, phone:f.phone.value.trim()||null, active:f.active.checked,
+      manager_id:num(f.manager_id.value), hired_on:f.hired_on.value||null, notes:f.notes.value.trim()||null };
+    if(id && row.manager_id && (row.manager_id === id || isUnder(row.manager_id, id))) return toast('Өөрийн доод ажилтныг удирдлага болгож болохгүй','bad');
     const r = await run(() => id ? dbUpdate('employees', id, row) : dbInsert('employees', row), id ? 'Хадгалагдлаа' : 'Ажилтан нэмэгдлээ');
     if(r){ render(); openProfile(r.id); }
   },
