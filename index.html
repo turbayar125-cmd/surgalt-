@@ -155,6 +155,15 @@ textarea.inp{resize:vertical;min-height:70px}
 .av-md{width:40px;height:40px;font-size:14px}
 .av-lg{width:56px;height:56px;font-size:18px}
 .av-xl{width:112px;height:112px;font-size:34px}
+.av-pick{position:relative;display:inline-grid;border-radius:50%;cursor:pointer;flex:none}
+.av-cam{position:absolute;right:-3px;bottom:-3px;width:20px;height:20px;border-radius:50%;background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;border:2px solid var(--surface);opacity:0;transition:opacity .15s}
+.av-pick.no-photo .av-cam{opacity:.85}
+.av-pick:hover .av-cam,.av-pick:focus-visible .av-cam{opacity:1}
+.av-pick:hover .av{filter:brightness(.92)}
+.av-pick.busy .av{opacity:.4}
+.av-sm + .av-cam,.av-pick .av-sm ~ .av-cam{width:16px;height:16px;right:-4px;bottom:-4px}
+@media (hover:none){.av-cam{opacity:1}}
+.photo-over{outline:2px dashed var(--accent);outline-offset:2px}
 
 /* dept bars */
 .drow{display:grid;grid-template-columns:minmax(0,1.3fr) 56px minmax(0,1.5fr) 46px;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line-2);cursor:pointer}
@@ -414,6 +423,19 @@ function avatar(e, size='md'){
   if(e?.photo_url) return `<img class="av av-${size}" src="${esc(e.photo_url)}" alt="">`;
   const h = ((e?.id||1) * 47) % 360;
   return `<span class="av av-${size} av-ini" style="--h:${h}" aria-hidden="true">${esc(initials(e?.full_name))}</span>`;
+}
+
+const CAM = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+// Зураг дээр дарж шууд оруулах/солих
+function avatarPick(e, size='md'){
+  return `<span class="av-pick ${e.photo_url?'':'no-photo'}" data-act="pick-photo" data-id="${e.id}" role="button" tabindex="0" title="${e.photo_url?'Зураг солих':'Зураг оруулах'} (эсвэл зургаа энд чирж оруулна)" aria-label="${esc(e.full_name)}: зураг ${e.photo_url?'солих':'оруулах'}">${avatar(e,size)}<span class="av-cam" aria-hidden="true">${CAM}</span></span>`;
+}
+async function setPhoto(id, file){
+  if(!file || !/^image\//.test(file.type)) return toast('Зураг (jpg, png…) сонгоно уу','bad');
+  $$(`.av-pick[data-id="${id}"]`).forEach(x => x.classList.add('busy'));
+  const r = await run(() => uploadPhoto(id, file), 'Зураг хадгалагдлаа');
+  $$(`.av-pick[data-id="${id}"]`).forEach(x => x.classList.remove('busy'));
+  if(r) refresh();
 }
 
 /* ---------- data layer ---------- */
@@ -691,7 +713,7 @@ function viewOrg(){
 function viewTeam(deptId){
   const d = IDX.dept.get(deptId), t = teamTree(deptId), st = teamStats(t.members);
   const onode = (e, head) => { const s = empStatus(e.id), n = (t.kids.get(e.id)||[]).length;
-    return `<button class="onode st-${s} ${head?'head':''}" data-act="profile" data-id="${e.id}" title="${esc(e.full_name)} — ${esc(e.position||'')} · ${ST[s]}">${avatar(e,'sm')}<span class="on-txt"><span class="on-name">${esc(e.full_name)}</span><span class="on-pos">${esc(e.position||'—')}</span></span>${n?`<span class="on-cnt" title="${n} шууд харьяалагдах">${n}</span>`:''}</button>`; };
+    return `<button class="onode st-${s} ${head?'head':''}" data-act="profile" data-id="${e.id}" data-photo-drop="${e.id}" title="${esc(e.full_name)} — ${esc(e.position||'')} · ${ST[s]}">${avatarPick(e,'sm')}<span class="on-txt"><span class="on-name">${esc(e.full_name)}</span><span class="on-pos">${esc(e.position||'—')}</span></span>${n?`<span class="on-cnt" title="${n} шууд харьяалагдах">${n}</span>`:''}</button>`; };
   const drawn = new Set();
   const branch = (e, depth) => {
     drawn.add(e.id);
@@ -746,7 +768,7 @@ function listEmps(){
   if(!l.length) return `<div class="panel empty">Хайлтад тохирох ажилтан олдсонгүй.</div>`;
   return `<p class="count">${l.length} ажилтан</p><div class="cards">${l.map(e => {
     const tl = (IDX.byEmp.get(e.id)||[]).sort((a,b) => a.days - b.days), st = empStatus(e.id);
-    return `<button class="ecard ${e.active?'':'inactive'}" data-act="profile" data-id="${e.id}">${avatar(e,'lg')}
+    return `<button class="ecard ${e.active?'':'inactive'}" data-act="profile" data-id="${e.id}" data-photo-drop="${e.id}">${avatarPick(e,'lg')}
       <span style="min-width:0"><span class="e-name">${esc(e.full_name)}</span><br><span class="e-pos">${esc(e.position||'—')}</span><br><span class="e-pos">${esc(deptName(e.department_id))}</span>
       <span class="e-meta">${e.active ? chip(st) : chip('none','Гарсан')}<span class="dots" title="${tl.length} сургалт">${tl.map(c => `<i class="d-${c.status}"></i>`).join('')}</span></span></span></button>`;
   }).join('')}</div>`;
@@ -875,7 +897,7 @@ function profileBody(id){
   const old = S.trs.filter(t => t.employee_id === id && !IDX.currentIds.has(t.id)).sort((a,b) => b.expires_on.localeCompare(a.expires_on));
   const mgr = e.manager_id ? IDX.emp.get(e.manager_id) : null;
   const reps = S.emps.filter(x => x.manager_id === id && x.active).sort((a,b) => a.full_name.localeCompare(b.full_name,'mn'));
-  return `<div class="prof-top"><div class="prof-photo">${avatar(e,'xl')}<label class="btn btn-sm">Зураг ${e.photo_url?'солих':'оруулах'}<input type="file" accept="image/*" data-photo="${id}" hidden></label></div>
+  return `<div class="prof-top"><div class="prof-photo" data-photo-drop="${id}">${avatarPick(e,'xl')}<label class="btn btn-sm">Зураг ${e.photo_url?'солих':'оруулах'}<input type="file" accept="image/*" data-photo="${id}" hidden></label></div>
     <div style="min-width:0"><h3>${esc(e.full_name)}</h3><p class="muted" style="margin:2px 0 0">${esc(e.position||'—')} · ${esc(deptName(e.department_id))}</p>
       <div style="margin-top:8px">${e.active ? chip(empStatus(id)) : chip('none','Ажлаас гарсан')}</div>
       <dl class="kv"><dt>Код</dt><dd class="mono">${esc(e.emp_code||'—')}</dd><dt>Имэйл</dt><dd>${e.email?`<a href="mailto:${esc(e.email)}">${esc(e.email)}</a>`:'—'}</dd><dt>Утас</dt><dd class="mono">${e.phone?`<a href="tel:${esc(e.phone)}">${esc(e.phone)}</a>`:'—'}</dd>
@@ -1275,6 +1297,8 @@ const ACT = {
   'send-now': async a => { a.disabled = true; const n = await run(sendNow, n => DEMO ? `Демо: ${n} имэйл илгээгдэх байсан` : `${n} сануулга илгээлээ`); a.disabled = false; if(n != null) render(); },
   'del-dept': async a => { const d = IDX.dept.get(Number(a.dataset.id)); const c = S.emps.filter(e => e.department_id === d.id).length; if(!await askConfirm(`"${d.name}" албыг устгах уу?${c?` ${c} ажилтан албагүй болно.`:''}`)) return; await run(async () => { await dbDelete('departments', d.id); render(); }, 'Алба устгагдлаа'); },
   'del-type': async a => { const t = IDX.type.get(Number(a.dataset.id)); const c = S.trs.filter(x => x.training_type_id === t.id).length; if(!await askConfirm(`"${t.name}"-г устгах уу?${c?` Үүнтэй холбоотой ${c} бичлэг мөн устна.`:''}`)) return; await run(async () => { await dbDelete('training_types', t.id); render(); }, 'Устгагдлаа'); },
+  'pick-photo': a => { const id = Number(a.dataset.id); const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
+    inp.onchange = () => setPhoto(id, inp.files[0]); inp.click(); },
   'imp-apply': async a => { a.disabled = true; a.textContent = 'Оруулж байна…';
     const r = await run(applyImport); if(!r){ a.disabled = false; a.textContent = 'Оруулах'; return; }
     S.imp = null; closeModal(); render();
@@ -1285,7 +1309,11 @@ document.addEventListener('click', ev => { const a = ev.target.closest('[data-ac
 document.addEventListener('keydown', ev => {
   if(ev.key === 'Escape' && $('#modal-root').innerHTML && !$('#confirm-root').innerHTML) closeModal();
   if(ev.key === 'Enter' && ev.target.matches('.drow')) ev.target.click();
+  if((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches('.av-pick')){ ev.preventDefault(); ev.stopPropagation(); ACT['pick-photo'](ev.target); }
 });
+document.addEventListener('dragover', ev => { const c = ev.target.closest?.('[data-photo-drop]'); if(c && ev.dataTransfer?.types.includes('Files')){ ev.preventDefault(); $$('.photo-over').forEach(x => x !== c && x.classList.remove('photo-over')); c.classList.add('photo-over'); } });
+document.addEventListener('dragleave', ev => { const c = ev.target.closest?.('[data-photo-drop]'); if(c && !c.contains(ev.relatedTarget)) c.classList.remove('photo-over'); });
+document.addEventListener('drop', ev => { const c = ev.target.closest?.('[data-photo-drop]'); if(!c) return; ev.preventDefault(); c.classList.remove('photo-over'); setPhoto(Number(c.dataset.photoDrop), ev.dataTransfer.files[0]); });
 document.addEventListener('dragover', ev => { const z = ev.target.closest?.('[data-drop]'); if(!z) return; ev.preventDefault(); z.classList.add('over'); });
 document.addEventListener('dragleave', ev => { const z = ev.target.closest?.('[data-drop]'); if(z && !z.contains(ev.relatedTarget)) z.classList.remove('over'); });
 document.addEventListener('drop', ev => { const z = ev.target.closest?.('[data-drop]'); if(!z) return; ev.preventDefault(); z.classList.remove('over'); const f = ev.dataTransfer.files[0]; if(f) startImport(f); });
