@@ -75,6 +75,15 @@ button,input,select,textarea{font:inherit;color:inherit}
 .nav .badge{margin-left:auto;background:#e5484d;color:#fff;font-size:11px;font-weight:600;border-radius:10px;padding:0 7px;line-height:18px}
 .side-foot{margin-top:auto;font-size:12px;color:var(--s-muted);padding:0 6px;display:flex;flex-direction:column;gap:8px}
 .side-foot .btn-link{color:#8fb4f0}
+.logout{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--s-line);background:var(--s-hover);color:var(--s-fg);border-radius:7px;padding:8px 10px;cursor:pointer;font-weight:500;font-size:13px;width:100%}
+.logout:hover{background:#3a2430;border-color:#6b3040;color:#ffd6dc}
+.who-email{overflow-wrap:anywhere}
+.imp-list{display:flex;flex-direction:column}
+.imp-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line-2)}
+.imp-row:last-child{border-bottom:0}
+.imp-row.undone{opacity:.55}
+.imp-row .p-sub{display:block}
+.danger-zone{border:1px solid var(--bad-soft);border-radius:9px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .main{min-width:0;padding-block:24px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
 @media (min-width:861px){.main{padding-left:32px;padding-right:32px}}
@@ -84,7 +93,10 @@ button,input,select,textarea{font:inherit;color:inherit}
   .brand div{display:none}
   .nav{flex-direction:row}
   .nav button span.lbl{font-size:13px}
-  .side-foot{display:none}
+  .side-foot{display:flex;margin:0 0 0 auto;flex-direction:row;align-items:center;padding:0 0 0 8px;position:sticky;right:0;background:var(--s-bg);box-shadow:-10px 0 10px var(--s-bg)}
+  .side-foot .role,.side-foot .who-email{display:none}
+  .logout{width:auto;padding:7px 9px;white-space:nowrap}
+  .logout .lbl{display:none}
 }
 
 .demo-bar{background:var(--warn-soft);color:var(--warn);border-radius:var(--r);padding:10px 14px;font-size:13px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
@@ -356,7 +368,7 @@ const S = {
   settings:{ reminder_days:[30,14,7,1,0], hr_email:'', from_email:'Сургалт <noreply@otpclicenses.mn>', company_name:'Манай байгууллага', last_import:null },
   ef:{ q:'', dept:'', status:'', inactive:false },
   tf:{ q:'', dept:'', type:'', status:'' },
-  openEmp:null, org:null, imp:null, admin:false, admins:[]
+  openEmp:null, org:null, imp:null, admin:false, admins:[], imports:[]
 };
 let IDX = {}; let DEMO_ID = 0;
 
@@ -457,7 +469,7 @@ async function fetchAll(table){
   return out;
 }
 async function loadAll(){
-  if(DEMO){ seedDemo(); S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
+  if(DEMO){ seedDemo(); S.imports = []; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
   const [d,e,t,tr] = await Promise.all(['departments','employees','training_types','trainings'].map(fetchAll));
   const l = await sb.from('reminder_log').select('*').order('sent_at',{ascending:false}).limit(2000);
   const s = await sb.from('settings').select('*').eq('id',1).maybeSingle();
@@ -469,6 +481,8 @@ async function loadAll(){
   S.admin = r.error ? /is_admin|function|schema cache/i.test(r.error.message||'') : !!r.data;
   S.admins = [];
   if(S.admin){ const a = await sb.from('app_admins').select('*').order('added_at'); if(!a.error) S.admins = a.data; }
+  const il = await sb.from('import_log').select('id,at,file,by_email,summary,data,undone_at').order('at', { ascending:false }).limit(15);
+  S.imports = il.error ? [] : il.data;
 }
 async function dbInsert(table, rows){
   const arr = Array.isArray(rows) ? rows : [rows]; let out = [];
@@ -490,6 +504,14 @@ async function dbDelete(table, id){
   if(table === 'training_types') S.trs = S.trs.filter(t => t.training_type_id !== id);
   if(table === 'departments') S.emps.forEach(e => { if(e.department_id === id) e.department_id = null; });
   if(table === 'trainings') S.logs = S.logs.filter(l => l.training_id !== id);
+  reindex();
+}
+async function dbDeleteMany(table, ids){
+  ids = [...new Set(ids)].filter(Boolean); if(!ids.length) return;
+  if(!DEMO) for(let i = 0; i < ids.length; i += 200){ const { error } = await sb.from(table).delete().in('id', ids.slice(i, i + 200)); if(error) throw error; }
+  const set = new Set(ids), k = TABLES[table]; S[k] = S[k].filter(x => !set.has(x.id));
+  if(table === 'employees'){ S.trs = S.trs.filter(t => !set.has(t.employee_id)); S.emps.forEach(e => { if(set.has(e.manager_id)) e.manager_id = null; }); }
+  if(table === 'trainings') S.logs = S.logs.filter(l => !set.has(l.training_id));
   reindex();
 }
 async function saveSettings(patch){
@@ -602,6 +624,7 @@ const I = {
   org:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="5" rx="1"/><rect x="2" y="17" width="6" height="5" rx="1"/><rect x="16" y="17" width="6" height="5" rx="1"/><path d="M12 7v5M5 17v-2.5h14V17M12 12v2.5"/></svg>',
   back:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
   up:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+  out:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>',
   mark:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>'
 };
 
@@ -620,7 +643,7 @@ function render(){
     <aside class="side">
       <div class="brand"><span class="brand-mark">${I.mark}</span><div><b>Сургалтын бүртгэл</b><small>${esc(S.settings.company_name||'')}</small></div></div>
       <nav class="nav" aria-label="Цэс">${nav.map(([k,l]) => `<button data-act="nav" data-v="${k}" ${S.view===k?'aria-current="page"':''}>${I[k]}<span class="lbl">${l}</span>${k==='trs'&&bad?`<span class="badge">${bad}</span>`:''}</button>`).join('')}</nav>
-      <div class="side-foot">${DEMO ? '<span>Демо горим</span>' : `<span class="role ${S.admin?'adm':'view'}">${S.admin?'Админ':'Зөвхөн харах'}</span><span>${esc(S.user?.email||'')}</span><button class="btn-link" data-act="logout" style="text-align:left">Гарах</button>`}</div>
+      <div class="side-foot">${DEMO ? '<span>Демо горим</span>' : `<span class="role ${S.admin?'adm':'view'}">${S.admin?'Админ':'Зөвхөн харах'}</span><span class="who-email">${esc(S.user?.email||'')}</span><button class="logout" data-act="logout" title="Системээс гарах" aria-label="Системээс гарах">${I.out}<span class="lbl">Системээс гарах</span></button>`}</div>
     </aside>
     <main class="main"><div class="wrap">${DEMO ? demoBar() : ''}${!DEMO && !S.admin ? '<div class="ro-note">Танд <b>зөвхөн харах</b> эрх байна. Мэдээлэл засах шаардлагатай бол админтай холбогдоно уу.</div>' : ''}${VIEWS[S.view]()}</div></main>
   </div>`;
@@ -890,6 +913,7 @@ E001 | Б.Батбаяр | Галын аюулгүй байдал | 2026-03-15  
         <p class="note"><b>4. Ажилтны жагсаалт</b> — сургалтгүй байсан ч болно. "Удирдлага" багана байвал (нэр эсвэл код) Алба цэсний бүтэц автоматаар зурагдана. Бусад танигдах багана: Имэйл, Утас, Ажилд орсон огноо.</p>
         <p class="note">Ажилтныг эхлээд код, байхгүй бол нэрээр нь таньдаг. Гарчгийн дээрх гарчиг, тайлбар мөрүүдийг автоматаар алгасна. "BP" гэх мэт бүлгийн гарчигтай мөрийн доорх хүмүүст алба автоматаар оноогдоно.</p>
       </div></details>
+    ${importsPanel()}
   </div></section>`;
 }
 const VIEWS = { dash:viewDash, org:viewOrg, emps:viewEmps, trs:viewTrs, settings:viewSettings };
@@ -1248,18 +1272,20 @@ async function applyImport(){
   const im = S.imp, pl = im.plan; if(!pl) return;
   // 1. алба
   const deptMap = new Map(S.depts.map(d => [normKey(d.name), d]));
-  if(pl.newDepts.length){ const made = await dbInsert('departments', pl.newDepts.map((n, i) => ({ name:n, sort:S.depts.length + i + 1 }))); made.forEach(d => deptMap.set(normKey(d.name), d)); }
+  const undo = { depts:[], types:[], emps:[], trainings:[], patches:[] };
+  if(pl.newDepts.length){ const made = await dbInsert('departments', pl.newDepts.map((n, i) => ({ name:n, sort:S.depts.length + i + 1 }))); made.forEach(d => { deptMap.set(normKey(d.name), d); undo.depts.push(d.id); }); }
   const deptId = n => matchDept(n, deptMap)?.id ?? null;
   // 2. сургалтын төрөл
   const typeMap = new Map(S.types.map(t => [normKey(t.name), t]));
-  if(pl.newTypes.length){ const made = await dbInsert('training_types', pl.newTypes.map(n => ({ name:n.name, validity_months:Math.max(1, Number(n.months) || 12) }))); made.forEach(t => typeMap.set(normKey(t.name), t)); }
+  if(pl.newTypes.length){ const made = await dbInsert('training_types', pl.newTypes.map(n => ({ name:n.name, validity_months:Math.max(1, Number(n.months) || 12) }))); made.forEach(t => { typeMap.set(normKey(t.name), t); undo.types.push(t.id); }); }
   // 3. шинэ ажилтан
   if(pl.empNew.length){
     const made = await dbInsert('employees', pl.empNew.map(({ row:r }) => ({ emp_code:r.code || null, full_name:r.name, department_id:deptId(r.dept), position:r.pos || null, email:r.email || null, phone:r.phone ? String(r.phone) : null, hired_on:r.hired || null, active:true })));
-    made.forEach((e, i) => pl.empNew[i].id = e.id);
+    made.forEach((e, i) => { pl.empNew[i].id = e.id; undo.emps.push(e.id); });
   }
   // 4. мэдээлэл шинэчлэх
-  for(const u of pl.empUpd){ const p = { ...u.patch }; if(p._dept){ p.department_id = deptId(p._dept); delete p._dept; } if(Object.keys(p).length) await dbUpdate('employees', u.e.id, p); }
+  const remember = (id, p) => { const cur = IDX.emp.get(id); if(!cur) return; const old = {}; for(const k of Object.keys(p)) old[k] = cur[k] ?? null; undo.patches.push({ id, old }); };
+  for(const u of pl.empUpd){ const p = { ...u.patch }; if(p._dept){ p.department_id = deptId(p._dept); delete p._dept; } if(Object.keys(p).length){ remember(u.e.id, p); await dbUpdate('employees', u.e.id, p); } }
   // 5. удирдлагын холбоос
   let links = 0;
   if(pl.mgrLinks.length){
@@ -1269,16 +1295,53 @@ async function applyImport(){
       const id = l.who._new ? l.who.id : l.who.id; let m = byCode.get(normKey(l.mgr));
       if(!m){ for(const k of nameKeys(l.mgr)){ const c = byName.get(k) || []; if(c.length === 1){ m = c[0]; break; } } }
       const me = IDX.emp.get(id);
-      if(m && me && m.id !== id && me.manager_id !== m.id && !isUnder(m.id, id)){ await dbUpdate('employees', id, { manager_id:m.id }); links++; }
+      if(m && me && m.id !== id && me.manager_id !== m.id && !isUnder(m.id, id)){ if(!undo.emps.includes(id)) remember(id, { manager_id:m.id }); await dbUpdate('employees', id, { manager_id:m.id }); links++; }
     }
   }
   // 6. сургалтын бичлэг
   const rows = pl.recNew.map(r => ({ employee_id:r.who.id, training_type_id:typeMap.get(r.tk).id, completed_on:r.done, expires_on:r.exp, certificate_no:r.cert, provider:r.prov }));
-  if(rows.length) await dbInsert('trainings', rows);
+  if(rows.length){ const made = await dbInsert('trainings', rows); undo.trainings = made.map(x => x.id); }
   const summary = { at:new Date().toISOString(), file:im.file, trainings:rows.length, new_emps:pl.empNew.length, updated:pl.empUpd.length, links };
+  const logRow = { at:summary.at, file:im.file, by_email:S.user?.email || null, summary, data:undo, undone_at:null };
+  if(DEMO) S.imports.unshift({ ...logRow, id:++DEMO_ID });
+  else { const { data, error } = await sb.from('import_log').insert(logRow).select().single(); if(error) console.warn('import_log:', error.message); else S.imports.unshift(data); }
+  summary.log_id = S.imports[0]?.at === summary.at ? S.imports[0].id : null;
   try{ await saveSettings({ last_import:summary }); } catch(e){ console.warn(e); S.settings.last_import = summary; }
   return summary;
 }
+async function undoImport(id){
+  const log = S.imports.find(x => x.id === id); if(!log || log.undone_at) return;
+  const d = log.data || {};
+  await dbDeleteMany('trainings', d.trainings || []);
+  for(const p of [...(d.patches || [])].reverse()) if(IDX.emp.has(p.id)) await dbUpdate('employees', p.id, p.old);
+  await dbDeleteMany('employees', d.emps || []);
+  await dbDeleteMany('training_types', (d.types || []).filter(t => !S.trs.some(r => r.training_type_id === t)));
+  await dbDeleteMany('departments', (d.depts || []).filter(x => !S.emps.some(e => e.department_id === x)));
+  const at = new Date().toISOString();
+  if(!DEMO){ const { error } = await sb.from('import_log').update({ undone_at:at }).eq('id', id); if(error) throw error; }
+  log.undone_at = at;
+  if(S.settings.last_import?.at === log.at){ const prev = S.imports.find(x => !x.undone_at); try{ await saveSettings({ last_import: prev ? prev.summary : null }); } catch{ S.settings.last_import = prev ? prev.summary : null; } }
+  return log;
+}
+async function wipeAll(){
+  await dbDeleteMany('trainings', S.trs.map(x => x.id));
+  await dbDeleteMany('employees', S.emps.map(x => x.id));
+  const keep = new Set(['bp','mt','cp','qaqc','wh','hse','administration','hr']);
+  await dbDeleteMany('departments', S.depts.filter(x => !keep.has(normKey(x.name))).map(x => x.id));
+  if(!DEMO){ const { error } = await sb.from('import_log').update({ undone_at:new Date().toISOString() }).is('undone_at', null); if(error) console.warn(error.message); }
+  S.imports.forEach(x => x.undone_at = x.undone_at || new Date().toISOString());
+  try{ await saveSettings({ last_import:null }); } catch{ S.settings.last_import = null; }
+}
+const importsPanel = () => {
+  const list = S.imports.slice(0, 10);
+  const row = l => { const sm = l.summary || {}, d = l.data || {}, can = !l.undone_at && (d.trainings || d.emps);
+    return `<div class="imp-row ${l.undone_at ? 'undone' : ''}"><span style="min-width:0"><b style="font-weight:500">${esc(l.file || 'Файл')}</b>
+      <span class="p-sub">${(t => fmtDate(ymd(t)) + ' ' + String(t.getHours()).padStart(2,'0') + ':' + String(t.getMinutes()).padStart(2,'0'))(new Date(l.at))} · +${sm.trainings ?? 0} сургалт, +${sm.new_emps ?? 0} ажилтан, ${sm.updated ?? 0} шинэчилсэн${l.by_email ? ' · ' + esc(l.by_email) : ''}${l.undone_at ? ' · <b>буцаагдсан</b>' : ''}</span></span>
+      ${can ? `<button class="btn btn-sm btn-danger" data-act="undo-imp" data-id="${l.id}">Буцаах</button>` : '<span></span>'}</div>`; };
+  return `<div><h4 style="font-size:14px;margin-bottom:4px">Оруулсан файлууд</h4>
+    ${list.length ? `<div class="imp-list">${list.map(row).join('')}</div>` : '<p class="note">Одоогоор бүртгэгдсэн импорт алга. (Энэ боломж нэмэгдэхээс өмнө оруулсан файлыг буцаах бол доорх "Бүгдийг цэвэрлэх"-ийг ашиглана.)</p>'}</div>
+    <div class="danger-zone"><span><b style="color:var(--bad)">Бүгдийг цэвэрлэх</b><br><span class="note">Бүх ажилтан, сургалтын бичлэгийг устгаж, 8 үндсэн албыг үлдээнэ. Буруу файл оруулсан бол дахин эхлэхэд хэрэглэнэ.</span></span><button class="btn btn-sm btn-danger" data-act="wipe-all">Бүгдийг устгах</button></div>`;
+};
 const lastImportText = () => { const l = S.settings.last_import; if(!l) return ''; return `Сүүлд шинэчилсэн: ${fmtDate(String(l.at).slice(0,10))} · ${esc(l.file)} · +${l.trainings} бичлэг`; };
 const importBtn = (label = 'Excel оруулах', cls = 'btn') => `<label class="${cls}" style="cursor:pointer">${label}<input type="file" accept=".xlsx,.xls,.xlsm,.csv,.txt" data-import="file" hidden></label>`;
 function exportCSV(){
@@ -1325,10 +1388,19 @@ const ACT = {
   'imp-apply': async a => { a.disabled = true; a.textContent = 'Оруулж байна…';
     const r = await run(applyImport); if(!r){ a.disabled = false; a.textContent = 'Оруулах'; return; }
     S.imp = null; closeModal(); render();
-    openModal({ title:'Импорт амжилттай', body:`<p style="margin:0"><b>${r.trainings}</b> сургалтын бичлэг нэмэгдэж, <b>${r.new_emps}</b> шинэ ажилтан, <b>${r.updated}</b> ажилтны мэдээлэл шинэчлэгдлээ${r.links ? `, <b>${r.links}</b> удирдлагын холбоос тохирууллаа` : ''}.</p>${DEMO ? '<p class="note">Демо горим: хуудсыг дахин ачаалахад өөрчлөлт арилна.</p>' : ''}<div class="m-foot"><button class="btn btn-primary" data-act="close">Болсон</button></div>` }); },
-  logout: async () => { await sb.auth.signOut(); S.ready = false; S.auth = 'login'; render(); }
+    openModal({ title:'Импорт амжилттай', body:`<p style="margin:0"><b>${r.trainings}</b> сургалтын бичлэг нэмэгдэж, <b>${r.new_emps}</b> шинэ ажилтан, <b>${r.updated}</b> ажилтны мэдээлэл шинэчлэгдлээ${r.links ? `, <b>${r.links}</b> удирдлагын холбоос тохирууллаа` : ''}.</p>${DEMO ? '<p class="note">Демо горим: хуудсыг дахин ачаалахад өөрчлөлт арилна.</p>' : ''}<div class="m-foot">${r.log_id ? `<button class="btn btn-danger" data-act="undo-imp" data-id="${r.log_id}">Буцаах</button>` : ''}<button class="btn btn-primary" data-act="close">Болсон</button></div>` }); },
+  'undo-imp': async a => { const l = S.imports.find(x => x.id === Number(a.dataset.id)); if(!l) return; const d = l.data || {};
+    if(!await askConfirm(`"${l.file}" файлаар оруулсныг буцаах уу? ${(d.trainings||[]).length} сургалтын бичлэг, ${(d.emps||[]).length} шинэ ажилтан устаж, ${(d.patches||[]).length} ажилтны мэдээлэл өмнөх байдалдаа орно. Эдгээрт дараа нь гараар хийсэн өөрчлөлт ч арилна.`, 'Буцаах')) return;
+    a.disabled = true; const r = await run(() => undoImport(l.id), 'Импорт буцаагдлаа'); a.disabled = false; if(r){ closeModal(); render(); } },
+  'wipe-all': async a => { if(!await askConfirm(`Бүх ${S.emps.length} ажилтан, ${S.trs.length} сургалтын бичлэгийг бүрмөсөн устгах уу? Энэ үйлдлийг буцаах боломжгүй.`, 'Бүгдийг устгах')) return;
+    if(!await askConfirm('Та итгэлтэй байна уу? Сүүлчийн баталгаажуулалт.', 'Тийм, устга')) return;
+    a.disabled = true; const r = await run(async () => { await wipeAll(); return true; }, 'Бүх өгөгдөл цэвэрлэгдлээ'); a.disabled = false; if(r) render(); },
+  logout: async () => { if(!await askConfirm('Системээс гарах уу?', 'Гарах')) return;
+    try{ await sb.auth.signOut({ scope:'local' }); } catch(e){ console.warn(e); }
+    Object.assign(S, { ready:false, auth:'login', user:null, admin:false, admins:[], imports:[], depts:[], emps:[], trs:[], types:[], logs:[], view:'dash', org:null });
+    closeModal(); document.body.classList.remove('ro'); render(); toast('Системээс гарлаа'); }
 };
-const ADMIN_ACTS = new Set(['new-emp','edit-emp','del-emp','new-tr','edit-tr','renew','del-tr','bulk','bulk-all','send-now','del-dept','del-type','pick-photo','imp-apply','del-admin']);
+const ADMIN_ACTS = new Set(['undo-imp','wipe-all','new-emp','edit-emp','del-emp','new-tr','edit-tr','renew','del-tr','bulk','bulk-all','send-now','del-dept','del-type','pick-photo','imp-apply','del-admin']);
 const denied = () => { toast('Танд засах эрх алга. Админтай холбогдоно уу.','bad'); };
 document.addEventListener('click', ev => { const a = ev.target.closest('[data-act]'); if(!a) return; if(!S.admin && ADMIN_ACTS.has(a.dataset.act)){ ev.preventDefault(); return denied(); } const f = ACT[a.dataset.act]; if(f){ if(a.tagName === 'A') ev.preventDefault(); f(a, ev); } });
 document.addEventListener('keydown', ev => {
