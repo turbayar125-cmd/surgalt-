@@ -82,15 +82,50 @@ insert into public.departments (name, sort) values
 on conflict (name) do nothing;
 
 -- ---------- Эрх (RLS): зөвхөн нэвтэрсэн хэрэглэгч ----------
+-- ---------- Эрх: админ засна, бусад нэвтэрсэн хэрэглэгч зөвхөн харна ----------
+create table if not exists public.app_admins (
+  email      text primary key check (email = lower(email)),
+  added_at   timestamptz not null default now()
+);
+-- Анхны админ (өөр имэйл бол энд сольж ажиллуулна)
+insert into public.app_admins (email) values ('turbayar125@gmail.com') on conflict do nothing;
+
+create or replace function public.is_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.app_admins where email = lower(coalesce(auth.jwt() ->> 'email', '')));
+$$;
+revoke all on function public.is_admin() from public, anon;
+grant execute on function public.is_admin() to authenticated;
+
 do $$
 declare t text;
 begin
-  foreach t in array array['departments','employees','training_types','trainings','reminder_log','settings'] loop
+  foreach t in array array['departments','employees','training_types','trainings','reminder_log','settings','app_admins'] loop
     execute format('alter table public.%I enable row level security', t);
     execute format('drop policy if exists "auth_all" on public.%I', t);
-    execute format('create policy "auth_all" on public.%I for all to authenticated using (true) with check (true)', t);
+    execute format('drop policy if exists "read_all" on public.%I', t);
+    execute format('drop policy if exists "admin_insert" on public.%I', t);
+    execute format('drop policy if exists "admin_update" on public.%I', t);
+    execute format('drop policy if exists "admin_delete" on public.%I', t);
+    execute format('create policy "read_all" on public.%I for select to authenticated using (true)', t);
+    execute format('create policy "admin_insert" on public.%I for insert to authenticated with check (public.is_admin())', t);
+    execute format('create policy "admin_update" on public.%I for update to authenticated using (public.is_admin()) with check (public.is_admin())', t);
+    execute format('create policy "admin_delete" on public.%I for delete to authenticated using (public.is_admin())', t);
   end loop;
 end $$;
+
+-- Сүүлийн админыг устгахаас сэргийлнэ
+create or replace function public.keep_one_admin() returns trigger
+language plpgsql as $$
+begin
+  if (select count(*) from public.app_admins) = 0 then
+    raise exception 'Дор хаяж нэг админ үлдэх ёстой';
+  end if;
+  return null;
+end $$;
+drop trigger if exists keep_one_admin on public.app_admins;
+create trigger keep_one_admin after delete on public.app_admins
+  for each statement execute function public.keep_one_admin();
 
 -- "Automatically expose new tables" унтраалттай байсан ч ажиллахаар эрхийг шууд олгоно
 grant usage on schema public to authenticated;
@@ -106,9 +141,9 @@ drop policy if exists "photos_auth_insert" on storage.objects;
 drop policy if exists "photos_auth_update" on storage.objects;
 drop policy if exists "photos_auth_delete" on storage.objects;
 create policy "photos_auth_select" on storage.objects for select to authenticated using (bucket_id = 'photos');
-create policy "photos_auth_insert" on storage.objects for insert to authenticated with check (bucket_id = 'photos');
-create policy "photos_auth_update" on storage.objects for update to authenticated using (bucket_id = 'photos');
-create policy "photos_auth_delete" on storage.objects for delete to authenticated using (bucket_id = 'photos');
+create policy "photos_auth_insert" on storage.objects for insert to authenticated with check (bucket_id = 'photos' and public.is_admin());
+create policy "photos_auth_update" on storage.objects for update to authenticated using (bucket_id = 'photos' and public.is_admin());
+create policy "photos_auth_delete" on storage.objects for delete to authenticated using (bucket_id = 'photos' and public.is_admin());
 
 -- ---------- Имэйл сануулга (Resend) ----------
 create or replace function public.html_esc(s text) returns text
@@ -128,6 +163,9 @@ declare
   body   text;
   sent   int := 0;
 begin
+  if auth.uid() is not null and not public.is_admin() then
+    raise exception 'Зөвхөн админ илгээх эрхтэй';
+  end if;
   select * into cfg from public.settings where id = 1;
   select decrypted_secret into api from vault.decrypted_secrets where name = 'resend_api_key' limit 1;
   if api is null then

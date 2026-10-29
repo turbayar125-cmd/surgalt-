@@ -164,6 +164,14 @@ textarea.inp{resize:vertical;min-height:70px}
 .av-sm + .av-cam,.av-pick .av-sm ~ .av-cam{width:16px;height:16px;right:-4px;bottom:-4px}
 @media (hover:none){.av-cam{opacity:1}}
 .photo-over{outline:2px dashed var(--accent);outline-offset:2px}
+/* Харах эрхтэй хэрэглэгчид засах товчнуудыг нууна */
+body.ro [data-act="new-emp"],body.ro [data-act="edit-emp"],body.ro [data-act="del-emp"],body.ro [data-act="new-tr"],body.ro [data-act="edit-tr"],
+body.ro [data-act="del-tr"],body.ro [data-act="renew"],body.ro [data-act="bulk"],body.ro [data-act="send-now"],body.ro [data-act="del-dept"],
+body.ro [data-act="del-type"],body.ro [data-act="del-admin"],body.ro label:has(> input[data-import]),body.ro label:has(> input[data-photo]),
+body.ro .tbl td.num:has([data-act="renew"]),body.ro .tr-act,body.ro .drop,body.ro .prof-top .actions{display:none!important}
+.role{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;border-radius:999px;padding:2px 9px;align-self:flex-start}
+.role.adm{background:#2a3a58;color:#cfe0ff} .role.view{background:#22303a;color:#bfe3cf}
+.ro-note{background:var(--surface-2);color:var(--muted);border-radius:var(--r);padding:9px 14px;font-size:13px}
 
 /* dept bars */
 .drow{display:grid;grid-template-columns:minmax(0,1.3fr) 56px minmax(0,1.5fr) 46px;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line-2);cursor:pointer}
@@ -348,7 +356,7 @@ const S = {
   settings:{ reminder_days:[30,14,7,1,0], hr_email:'', from_email:'Сургалт <noreply@otpclicenses.mn>', company_name:'Манай байгууллага', last_import:null },
   ef:{ q:'', dept:'', status:'', inactive:false },
   tf:{ q:'', dept:'', type:'', status:'' },
-  openEmp:null, org:null, imp:null
+  openEmp:null, org:null, imp:null, admin:false, admins:[]
 };
 let IDX = {}; let DEMO_ID = 0;
 
@@ -373,7 +381,7 @@ function normDate(v){
   return null;
 }
 function toast(msg, kind=''){ const t=document.createElement('div'); t.className='toast '+kind; t.textContent=msg; $('#toasts').appendChild(t); setTimeout(()=>t.remove(), kind==='bad'?6000:3200); }
-function errMsg(e){ const m = e?.message || String(e); if(e?.code==='23505') return 'Давхардсан утга байна (код эсвэл нэр өөр байх ёстой).'; if(/JWT|session/i.test(m)) return 'Нэвтрэлт дууссан байна. Дахин нэвтэрнэ үү.'; return 'Алдаа: '+m; }
+function errMsg(e){ const m = e?.message || String(e); if(e?.code==='23505') return 'Давхардсан утга байна (код эсвэл нэр өөр байх ёстой).'; if(/JWT|session/i.test(m)) return 'Нэвтрэлт дууссан байна. Дахин нэвтэрнэ үү.'; if(/row-level security|permission denied|Зөвхөн админ/i.test(m) || e?.code === '42501') return 'Танд засах эрх алга. Админтай холбогдоно уу.'; return 'Алдаа: '+m; }
 async function run(fn, okMsg){ try{ const r = await fn(); if(okMsg) toast(typeof okMsg==='function'?okMsg(r):okMsg); return r; } catch(e){ console.error(e); toast(errMsg(e),'bad'); } }
 
 /* ---------- status ---------- */
@@ -428,6 +436,7 @@ function avatar(e, size='md'){
 const CAM = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
 // Зураг дээр дарж шууд оруулах/солих
 function avatarPick(e, size='md'){
+  if(!S.admin) return avatar(e, size);
   return `<span class="av-pick ${e.photo_url?'':'no-photo'}" data-act="pick-photo" data-id="${e.id}" role="button" tabindex="0" title="${e.photo_url?'Зураг солих':'Зураг оруулах'} (эсвэл зургаа энд чирж оруулна)" aria-label="${esc(e.full_name)}: зураг ${e.photo_url?'солих':'оруулах'}">${avatar(e,size)}<span class="av-cam" aria-hidden="true">${CAM}</span></span>`;
 }
 async function setPhoto(id, file){
@@ -448,13 +457,18 @@ async function fetchAll(table){
   return out;
 }
 async function loadAll(){
-  if(DEMO){ seedDemo(); return; }
+  if(DEMO){ seedDemo(); S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
   const [d,e,t,tr] = await Promise.all(['departments','employees','training_types','trainings'].map(fetchAll));
   const l = await sb.from('reminder_log').select('*').order('sent_at',{ascending:false}).limit(2000);
   const s = await sb.from('settings').select('*').eq('id',1).maybeSingle();
   if(l.error) throw l.error; if(s.error) throw s.error;
   Object.assign(S, { depts:d, emps:e, types:t, trs:tr, logs:l.data });
   if(s.data) S.settings = s.data;
+  const r = await sb.rpc('is_admin');
+  // is_admin функц байхгүй (шинэ setup.sql ажиллуулаагүй) бол хуучин горимоор бүгд засна
+  S.admin = r.error ? /is_admin|function|schema cache/i.test(r.error.message||'') : !!r.data;
+  S.admins = [];
+  if(S.admin){ const a = await sb.from('app_admins').select('*').order('added_at'); if(!a.error) S.admins = a.data; }
 }
 async function dbInsert(table, rows){
   const arr = Array.isArray(rows) ? rows : [rows]; let out = [];
@@ -599,14 +613,16 @@ function render(){
     app.innerHTML = `<div class="login"><div class="spinner" role="status" aria-label="Ачаалж байна"></div></div>`; return;
   }
   const bad = activeCurrent().filter(c => c.status === 'bad').length;
-  const nav = [['dash','Хянах самбар'],['org','Алба'],['emps','Ажилтнууд'],['trs','Сургалтын бүртгэл'],['settings','Тохиргоо']];
+  document.body.classList.toggle('ro', !S.admin);
+  if(!S.admin && S.view === 'settings') S.view = 'dash';
+  const nav = [['dash','Хянах самбар'],['org','Алба'],['emps','Ажилтнууд'],['trs','Сургалтын бүртгэл'], ...(S.admin ? [['settings','Тохиргоо']] : [])];
   app.innerHTML = `<div class="shell">
     <aside class="side">
       <div class="brand"><span class="brand-mark">${I.mark}</span><div><b>Сургалтын бүртгэл</b><small>${esc(S.settings.company_name||'')}</small></div></div>
       <nav class="nav" aria-label="Цэс">${nav.map(([k,l]) => `<button data-act="nav" data-v="${k}" ${S.view===k?'aria-current="page"':''}>${I[k]}<span class="lbl">${l}</span>${k==='trs'&&bad?`<span class="badge">${bad}</span>`:''}</button>`).join('')}</nav>
-      <div class="side-foot">${DEMO ? '<span>Демо горим</span>' : `<span>${esc(S.user?.email||'')}</span><button class="btn-link" data-act="logout" style="text-align:left">Гарах</button>`}</div>
+      <div class="side-foot">${DEMO ? '<span>Демо горим</span>' : `<span class="role ${S.admin?'adm':'view'}">${S.admin?'Админ':'Зөвхөн харах'}</span><span>${esc(S.user?.email||'')}</span><button class="btn-link" data-act="logout" style="text-align:left">Гарах</button>`}</div>
     </aside>
-    <main class="main"><div class="wrap">${DEMO ? demoBar() : ''}${VIEWS[S.view]()}</div></main>
+    <main class="main"><div class="wrap">${DEMO ? demoBar() : ''}${!DEMO && !S.admin ? '<div class="ro-note">Танд <b>зөвхөн харах</b> эрх байна. Мэдээлэл засах шаардлагатай бол админтай холбогдоно уу.</div>' : ''}${VIEWS[S.view]()}</div></main>
   </div>`;
   // org chart: дээд удирдлагыг дэлгэцийн голд гаргана
   $$('.org-scroll').forEach(el => { const h = el.querySelector('.onode.head'); if(!h) return; const a = el.getBoundingClientRect(), b = h.getBoundingClientRect(); el.scrollLeft += (b.left + b.width/2) - (a.left + a.width/2); });
@@ -851,6 +867,11 @@ function viewSettings(){
       <form data-form="add-type" class="set-row" style="margin-top:6px"><input class="inp" id="nt-name" name="name" placeholder="Шинэ сургалт" required><input class="inp mono" id="nt-m" name="months" type="number" min="1" value="12" aria-label="Сар"><button class="btn btn-sm" type="submit">Нэмэх</button></form>
     </div></section>
   </div>
+  <section class="panel"><div class="panel-head"><h2>Админ эрхтэй хүмүүс</h2><span class="chip chip-plain">${S.admins.length}</span></div><div class="panel-body" style="display:flex;flex-direction:column;gap:10px">
+    <p class="note">Энд бүртгэлтэй имэйлээр нэвтэрсэн хүн мэдээлэл засна. Бусад нэвтэрсэн хүн <b>зөвхөн харна</b>. Шинэ хүнд нэвтрэх эрх өгөхдөө Supabase → Authentication → Users → <b>Add user</b> хэсгээс үүсгэнэ.</p>
+    ${S.admins.map(a => `<div class="set-row two"><span>${esc(a.email)}${a.email === (S.user?.email||'').toLowerCase() ? ' <span class="muted">(та)</span>' : ''}</span>${a.email === (S.user?.email||'').toLowerCase() || S.admins.length < 2 ? '<span></span>' : `<button class="btn btn-sm btn-danger" data-act="del-admin" data-email="${esc(a.email)}">Хасах</button>`}</div>`).join('')}
+    <form data-form="add-admin" class="set-row two"><input class="inp" name="email" type="email" placeholder="admin@otpclicenses.mn" required aria-label="Админ имэйл"><button class="btn btn-sm" type="submit">Админ нэмэх</button></form>
+  </div></section>
   <section class="panel" id="import"><div class="panel-head"><h2>Excel матриц оруулах</h2><span class="last-imp">${lastImportText()}</span></div><div class="panel-body" style="display:flex;flex-direction:column;gap:14px">
     <div class="drop" data-drop>
       <b>Сургалтын матриц (.xlsx) эсвэл CSV файлаа энд чирж оруулна</b>
@@ -1299,13 +1320,17 @@ const ACT = {
   'del-type': async a => { const t = IDX.type.get(Number(a.dataset.id)); const c = S.trs.filter(x => x.training_type_id === t.id).length; if(!await askConfirm(`"${t.name}"-г устгах уу?${c?` Үүнтэй холбоотой ${c} бичлэг мөн устна.`:''}`)) return; await run(async () => { await dbDelete('training_types', t.id); render(); }, 'Устгагдлаа'); },
   'pick-photo': a => { const id = Number(a.dataset.id); const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
     inp.onchange = () => setPhoto(id, inp.files[0]); inp.click(); },
+  'del-admin': async a => { const em = a.dataset.email; if(!await askConfirm(`${em}-ийн админ эрхийг хасах уу? Тэр зөвхөн харах эрхтэй болно.`, 'Хасах')) return;
+    await run(async () => { if(!DEMO){ const { error } = await sb.from('app_admins').delete().eq('email', em); if(error) throw error; } S.admins = S.admins.filter(x => x.email !== em); render(); }, 'Эрх хасагдлаа'); },
   'imp-apply': async a => { a.disabled = true; a.textContent = 'Оруулж байна…';
     const r = await run(applyImport); if(!r){ a.disabled = false; a.textContent = 'Оруулах'; return; }
     S.imp = null; closeModal(); render();
     openModal({ title:'Импорт амжилттай', body:`<p style="margin:0"><b>${r.trainings}</b> сургалтын бичлэг нэмэгдэж, <b>${r.new_emps}</b> шинэ ажилтан, <b>${r.updated}</b> ажилтны мэдээлэл шинэчлэгдлээ${r.links ? `, <b>${r.links}</b> удирдлагын холбоос тохирууллаа` : ''}.</p>${DEMO ? '<p class="note">Демо горим: хуудсыг дахин ачаалахад өөрчлөлт арилна.</p>' : ''}<div class="m-foot"><button class="btn btn-primary" data-act="close">Болсон</button></div>` }); },
   logout: async () => { await sb.auth.signOut(); S.ready = false; S.auth = 'login'; render(); }
 };
-document.addEventListener('click', ev => { const a = ev.target.closest('[data-act]'); if(!a) return; const f = ACT[a.dataset.act]; if(f){ if(a.tagName === 'A') ev.preventDefault(); f(a, ev); } });
+const ADMIN_ACTS = new Set(['new-emp','edit-emp','del-emp','new-tr','edit-tr','renew','del-tr','bulk','bulk-all','send-now','del-dept','del-type','pick-photo','imp-apply','del-admin']);
+const denied = () => { toast('Танд засах эрх алга. Админтай холбогдоно уу.','bad'); };
+document.addEventListener('click', ev => { const a = ev.target.closest('[data-act]'); if(!a) return; if(!S.admin && ADMIN_ACTS.has(a.dataset.act)){ ev.preventDefault(); return denied(); } const f = ACT[a.dataset.act]; if(f){ if(a.tagName === 'A') ev.preventDefault(); f(a, ev); } });
 document.addEventListener('keydown', ev => {
   if(ev.key === 'Escape' && $('#modal-root').innerHTML && !$('#confirm-root').innerHTML) closeModal();
   if(ev.key === 'Enter' && ev.target.matches('.drow')) ev.target.click();
@@ -1313,10 +1338,10 @@ document.addEventListener('keydown', ev => {
 });
 document.addEventListener('dragover', ev => { const c = ev.target.closest?.('[data-photo-drop]'); if(c && ev.dataTransfer?.types.includes('Files')){ ev.preventDefault(); $$('.photo-over').forEach(x => x !== c && x.classList.remove('photo-over')); c.classList.add('photo-over'); } });
 document.addEventListener('dragleave', ev => { const c = ev.target.closest?.('[data-photo-drop]'); if(c && !c.contains(ev.relatedTarget)) c.classList.remove('photo-over'); });
-document.addEventListener('drop', ev => { const c = ev.target.closest?.('[data-photo-drop]'); if(!c) return; ev.preventDefault(); c.classList.remove('photo-over'); setPhoto(Number(c.dataset.photoDrop), ev.dataTransfer.files[0]); });
+document.addEventListener('drop', ev => { const c = ev.target.closest?.('[data-photo-drop]'); if(!c) return; ev.preventDefault(); if(!S.admin) return denied(); c.classList.remove('photo-over'); setPhoto(Number(c.dataset.photoDrop), ev.dataTransfer.files[0]); });
 document.addEventListener('dragover', ev => { const z = ev.target.closest?.('[data-drop]'); if(!z) return; ev.preventDefault(); z.classList.add('over'); });
 document.addEventListener('dragleave', ev => { const z = ev.target.closest?.('[data-drop]'); if(z && !z.contains(ev.relatedTarget)) z.classList.remove('over'); });
-document.addEventListener('drop', ev => { const z = ev.target.closest?.('[data-drop]'); if(!z) return; ev.preventDefault(); z.classList.remove('over'); const f = ev.dataTransfer.files[0]; if(f) startImport(f); });
+document.addEventListener('drop', ev => { const z = ev.target.closest?.('[data-drop]'); if(!z) return; ev.preventDefault(); if(!S.admin) return denied(); z.classList.remove('over'); const f = ev.dataTransfer.files[0]; if(f) startImport(f); });
 function updBulkCount(){ const n = $$('.pick-list input:checked').length; const c = $('#b-count'); if(c) c.textContent = `${n} сонгосон`; }
 document.addEventListener('input', ev => {
   const t = ev.target;
@@ -1330,6 +1355,7 @@ document.addEventListener('input', ev => {
 });
 document.addEventListener('change', async ev => {
   const t = ev.target;
+  if(!S.admin && (t.dataset.photo || t.dataset.import || t.dataset.edit)){ t.value = ''; return denied(); }
   if(t.dataset.photo && t.files[0]){ const id = Number(t.dataset.photo); await run(async () => { await uploadPhoto(id, t.files[0]); refresh(); }, 'Зураг хадгалагдлаа'); }
   if(t.dataset.import && t.files[0]){ const f = t.files[0]; t.value = ''; startImport(f); }
   if(t.dataset.imp && S.imp){
@@ -1379,9 +1405,11 @@ const FORMS = {
     render();
   },
   'add-dept': async f => { const n = f.name.value.trim(); await run(async () => { await dbInsert('departments', { name:n, sort:S.depts.length+1 }); render(); }, 'Алба нэмэгдлээ'); },
+  'add-admin': async f => { const em = f.email.value.trim().toLowerCase(); if(S.admins.some(a => a.email === em)) return toast('Аль хэдийн админ байна','bad');
+    await run(async () => { let row = { email:em }; if(!DEMO){ const { data, error } = await sb.from('app_admins').insert(row).select().single(); if(error) throw error; row = data; } S.admins.push(row); render(); }, 'Админ нэмэгдлээ'); },
   'add-type': async f => { const n = f.name.value.trim(), m = Number(f.months.value)||12; await run(async () => { await dbInsert('training_types', { name:n, validity_months:m }); render(); }, 'Сургалт нэмэгдлээ'); }
 };
-document.addEventListener('submit', ev => { const f = ev.target; if(!f.dataset.form) return; ev.preventDefault(); FORMS[f.dataset.form]?.(f); });
+document.addEventListener('submit', ev => { const f = ev.target; if(!f.dataset.form) return; ev.preventDefault(); if(!S.admin && f.dataset.form !== 'login') return denied(); FORMS[f.dataset.form]?.(f); });
 
 /* ---------- boot ---------- */
 async function start(){
