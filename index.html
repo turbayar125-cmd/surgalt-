@@ -320,6 +320,35 @@ pre.code{background:var(--surface-2);border-radius:7px;padding:10px 12px;font-fa
 .pchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:2px 10px 2px 2px;background:var(--surface);cursor:pointer;font-size:12.5px}
 .pchip:hover{border-color:var(--accent)}
 
+/* classic org chart */
+.org-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,520px),1fr));gap:14px}
+.org-mini .org-scroll{max-height:460px;overflow:auto;padding:14px 8px 16px}
+.org-mini .panel-head{gap:8px}
+.org-row{display:flex;gap:28px;justify-content:center;align-items:flex-start;min-width:max-content;margin:0 auto}
+.obox{width:150px;background:var(--surface);border:1px solid #3b65b5;border-radius:6px;overflow:hidden;position:relative;text-align:left;box-shadow:0 1px 2px rgba(20,40,90,.12)}
+.obox[draggable="true"]{cursor:grab}
+.ob-title{background:#4472c4;color:#fff;font-size:10.5px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;padding:5px 22px 5px 8px;line-height:1.25;min-height:22px;overflow-wrap:anywhere}
+.ob-title.blank{background:#7f9bd3;font-style:italic;text-transform:none}
+.ob-person{display:flex;gap:7px;align-items:center;padding:6px 8px;border-left:3px solid var(--nc,transparent);cursor:pointer;min-height:40px}
+.ob-person:hover .on-name{color:var(--accent)}
+.ob-person.st-ok{--nc:var(--ok)} .ob-person.st-warn{--nc:var(--warn)} .ob-person.st-bad{--nc:var(--bad)} .ob-person.st-none{--nc:var(--none)}
+.ob-empty{display:flex;align-items:center;justify-content:center;width:100%;min-height:40px;border:0;background:none;color:var(--faint);font-size:12px;cursor:pointer}
+.ob-empty:hover{color:var(--accent);background:var(--accent-soft)}
+span.ob-empty{cursor:default}
+.ob-menu{position:absolute;top:1px;right:1px;border:0;background:none;color:#fff;width:20px;height:20px;border-radius:4px;cursor:pointer;font-size:14px;line-height:1;opacity:.85}
+.ob-menu:hover{background:rgba(255,255,255,.2);opacity:1}
+.ob-add{display:block;margin:0 auto;width:30px;height:30px;border:0;background:none;color:#3b65b5;font-size:26px;line-height:1;cursor:pointer;border-radius:6px;position:relative;margin-top:14px}
+.ob-add::before{content:"";position:absolute;top:-14px;left:50%;height:12px;border-left:1.5px solid var(--faint)}
+.ob-add:hover{background:var(--accent-soft)}
+.leaf-group .ob-add{margin-top:2px}.leaf-group .ob-add::before{display:none}
+.org-mini .obox{width:122px}.org-mini .ob-title{font-size:9.5px;padding:4px 6px}.org-mini .ob-person{padding:4px 6px;min-height:32px;gap:5px}
+.org-mini .on-name{font-size:11.5px}.org-mini .on-pos{display:none}.org-mini .av-sm{width:22px;height:22px;font-size:9px}.org-mini .ob-empty{min-height:30px;font-size:11px}
+.drop-ok{outline:2px dashed var(--accent)!important;outline-offset:2px;background:var(--accent-soft)}
+.pool{display:flex;flex-wrap:wrap;gap:6px;max-height:240px;overflow:auto;padding:2px;min-height:44px;border-radius:8px}
+.pool .pchip{cursor:grab}
+.org-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.org-hint{font-size:12.5px;color:var(--muted);margin:0}
+
 /* import preview */
 .imp-sum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 @media (max-width:620px){.imp-sum{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -361,14 +390,14 @@ const CONFIG = {
 const DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
 const sb = (!DEMO && window.supabase) ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY) : null;
 
-const TABLES = { departments:'depts', employees:'emps', training_types:'types', trainings:'trs', reminder_log:'logs' };
+const TABLES = { departments:'depts', employees:'emps', training_types:'types', trainings:'trs', reminder_log:'logs', org_nodes:'nodes' };
 const S = {
   ready:false, auth:null, user:null, view:'dash',
   depts:[], emps:[], types:[], trs:[], logs:[],
   settings:{ reminder_days:[30,14,7,1,0], hr_email:'', from_email:'Сургалт <noreply@otpclicenses.mn>', company_name:'Манай байгууллага', last_import:null },
   ef:{ q:'', dept:'', status:'', inactive:false },
   tf:{ q:'', dept:'', type:'', status:'' },
-  openEmp:null, org:null, imp:null, admin:false, admins:[], imports:[]
+  openEmp:null, org:null, imp:null, admin:false, admins:[], imports:[], nodes:[]
 };
 let IDX = {}; let DEMO_ID = 0;
 
@@ -533,7 +562,7 @@ async function fetchAll(table){
   return out;
 }
 async function loadAll(){
-  if(DEMO){ seedDemo(); S.imports = []; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
+  if(DEMO){ seedDemo(); S.imports = []; S.nodes = []; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
   const [d,e,t,tr] = await Promise.all(['departments','employees','training_types','trainings'].map(fetchAll));
   const l = await sb.from('reminder_log').select('*').order('sent_at',{ascending:false}).limit(2000);
   const s = await sb.from('settings').select('*').eq('id',1).maybeSingle();
@@ -545,6 +574,7 @@ async function loadAll(){
   S.admin = r.error ? /is_admin|function|schema cache/i.test(r.error.message||'') : !!r.data;
   S.admins = [];
   if(S.admin){ const a = await sb.from('app_admins').select('*').order('added_at'); if(!a.error) S.admins = a.data; }
+  try{ S.nodes = await fetchAll('org_nodes'); } catch(e){ console.warn('org_nodes:', e.message); S.nodes = []; }
   const il = await sb.from('import_log').select('id,at,file,by_email,summary,data,undone_at').order('at', { ascending:false }).limit(15);
   S.imports = il.error ? [] : il.data;
 }
@@ -564,7 +594,8 @@ async function dbUpdate(table, id, patch){
 async function dbDelete(table, id){
   if(!DEMO){ const { error } = await sb.from(table).delete().eq('id', id); if(error) throw error; }
   const k = TABLES[table]; S[k] = S[k].filter(x => x.id !== id);
-  if(table === 'employees'){ S.trs = S.trs.filter(t => t.employee_id !== id); S.emps.forEach(e => { if(e.manager_id === id) e.manager_id = null; }); }
+  if(table === 'employees'){ S.trs = S.trs.filter(t => t.employee_id !== id); S.emps.forEach(e => { if(e.manager_id === id) e.manager_id = null; }); S.nodes.forEach(n => { if(n.employee_id === id) n.employee_id = null; }); }
+  if(table === 'departments') S.nodes = S.nodes.filter(n => n.department_id !== id);
   if(table === 'training_types') S.trs = S.trs.filter(t => t.training_type_id !== id);
   if(table === 'departments') S.emps.forEach(e => { if(e.department_id === id) e.department_id = null; });
   if(table === 'trainings') S.logs = S.logs.filter(l => l.training_id !== id);
@@ -574,7 +605,8 @@ async function dbDeleteMany(table, ids){
   ids = [...new Set(ids)].filter(Boolean); if(!ids.length) return;
   if(!DEMO) for(let i = 0; i < ids.length; i += 200){ const { error } = await sb.from(table).delete().in('id', ids.slice(i, i + 200)); if(error) throw error; }
   const set = new Set(ids), k = TABLES[table]; S[k] = S[k].filter(x => !set.has(x.id));
-  if(table === 'employees'){ S.trs = S.trs.filter(t => !set.has(t.employee_id)); S.emps.forEach(e => { if(set.has(e.manager_id)) e.manager_id = null; }); }
+  if(table === 'employees'){ S.trs = S.trs.filter(t => !set.has(t.employee_id)); S.emps.forEach(e => { if(set.has(e.manager_id)) e.manager_id = null; }); S.nodes.forEach(n => { if(set.has(n.employee_id)) n.employee_id = null; }); }
+  if(table === 'departments') S.nodes = S.nodes.filter(n => !set.has(n.department_id));
   if(table === 'trainings') S.logs = S.logs.filter(l => !set.has(l.training_id));
   reindex();
 }
@@ -710,7 +742,7 @@ function render(){
       <nav class="nav" aria-label="Цэс">${nav.map(([k,l]) => `<button data-act="nav" data-v="${k}" ${S.view===k?'aria-current="page"':''}>${I[k]}<span class="lbl">${l}</span>${k==='trs'&&bad?`<span class="badge">${bad}</span>`:''}</button>`).join('')}</nav>
       <div class="side-foot">${DEMO ? '<span>Демо горим</span>' : `<span class="role ${S.admin?'adm':'view'}">${S.admin?'Админ':'Зөвхөн харах'}</span><span class="who-email">${esc(S.user?.email||'')}</span><button class="logout" data-act="logout" title="Системээс гарах" aria-label="Системээс гарах">${I.out}<span class="lbl">Системээс гарах</span></button>`}</div>
     </aside>
-    <main class="main"><div class="wrap">${DEMO ? demoBar() : ''}${!DEMO && !S.admin ? '<div class="ro-note">Танд <b>зөвхөн харах</b> эрх байна. Мэдээлэл засах шаардлагатай бол админтай холбогдоно уу.</div>' : ''}${VIEWS[S.view]()}</div></main>
+    <main class="main"><div class="wrap">${DEMO ? demoBar() : ''}${!DEMO && !S.admin ? '<div class="ro-note">Танд <b>зөвхөн харах</b> эрх байна (Алба цэсний бүтцийг засах боломжтой). Бусад мэдээлэл засах бол админтай холбогдоно уу.</div>' : ''}${VIEWS[S.view]()}</div></main>
   </div>`;
   // org chart: дээд удирдлагыг дэлгэцийн голд гаргана
   $$('.org-scroll').forEach(el => { const h = el.querySelector('.onode.head'); if(!h) return; const a = el.getBoundingClientRect(), b = h.getBoundingClientRect(); el.scrollLeft += (b.left + b.width/2) - (a.left + a.width/2); });
@@ -793,64 +825,176 @@ function teamStats(members){
 }
 const statusBar = st => `<span class="bar" title="Хүчинтэй ${st.c.ok} · Дөхсөн ${st.c.warn} · Дууссан ${st.c.bad}"><i class="b-ok" style="width:${st.w(st.c.ok)}%"></i><i class="b-warn" style="width:${st.w(st.c.warn)}%"></i><i class="b-bad" style="width:${st.w(st.c.bad)}%"></i></span>`;
 
+/* ---------- сонгодог org chart (нэвтэрсэн бүх хэрэглэгч засна) ---------- */
+const canOrg = () => DEMO || !!S.user;
+const deptNodes = id => S.nodes.filter(n => n.department_id === id);
+const nodeSort = (a, b) => (a.sort ?? 0) - (b.sort ?? 0) || a.id - b.id;
+function kidsMap(id){ const K = new Map(); for(const n of deptNodes(id)){ const k = n.parent_id ?? 0; if(!K.has(k)) K.set(k, []); K.get(k).push(n); } K.forEach(l => l.sort(nodeSort)); return K; }
+const placedIds = () => new Set(S.nodes.filter(n => n.employee_id).map(n => n.employee_id));
+// Таны зурган дээрх загварууд. '' = нэргүй (ажилтан) хайрцаг
+const CH = (...t) => t.reduceRight((acc, x) => [x, acc ? [acc] : []], null);
+const ORG_TPL = {
+  qaqc: [0,1].map(() => ['Superintendent', [['Supervisor', [CH('Control Engineer','Laborant','Technician'), CH('Control Engineer','Laborant','Technician')]]]]),
+  bp:   [0,1].map(() => ['Superintendent', [['Senior Technology Engineer', [CH('Technology Engineer','',''), CH('Technology Engineer','','')]]]]),
+  wh:   [0,1].map(() => CH('Superintendent','Stock Keeper','','')),
+  cp:   [0,1].map(() => ['Superintendent', [CH('Shift Master','',''), CH('Shift Master','','')]]),
+  hr:   [['HR Manager', [['HR Officer', []], ['HR Officer', []]]]],
+  mt:   [['Manager', [['Senior Engineer', [['Deputy Engineer', [CH('Mechanic Engineer','',''), CH('Mechanic Engineer','','')]]]], ['Senior Engineer', [['Planning Engineer', [CH('Mechanic Engineer','',''), CH('Mechanic Engineer','','')]]]]]]]
+};
+const tplFor = d => ORG_TPL[normKey(d.name)] || null;
+
+function obox(n, edit){
+  const e = n.employee_id && IDX.emp.get(n.employee_id), st = e ? empStatus(e.id) : '';
+  const title = n.title?.trim();
+  return `<div class="obox" data-drop-node="${n.id}" ${edit ? `draggable="true" data-drag-node="${n.id}"` : ''}>
+    <div class="ob-title ${title ? '' : 'blank'}">${title ? esc(title) : 'Ажилтан'}</div>
+    ${edit ? `<button class="ob-menu" data-act="org-edit" data-id="${n.id}" title="Засах" aria-label="Хайрцаг засах">⋯</button>` : ''}
+    ${e ? `<div class="ob-person st-${st}" data-act="profile" data-id="${e.id}" ${edit ? `draggable="true" data-drag-emp="${e.id}" data-from="${n.id}"` : ''} title="${esc(e.full_name)} · ${esc(e.position||'')} · ${ST[st]}">${avatar(e,'sm')}<span class="on-txt"><span class="on-name">${esc(e.full_name)}</span><span class="on-pos">${esc(e.position||'')}</span></span></div>`
+       : edit ? `<button class="ob-empty" data-act="org-edit" data-id="${n.id}">+ Хүн сонгох</button>` : `<span class="ob-empty">Сул орон тоо</span>`}
+  </div>`;
+}
+const addBtn = pid => `<button class="ob-add" data-act="org-add" data-parent="${pid}" data-drop-add="${pid}" title="Доор нь хайрцаг нэмэх (хүнийг энд чирч болно)" aria-label="Доор нь нэмэх">+</button>`;
+function orgBranch(n, K, edit){
+  const ch = K.get(n.id) || [], leaves = ch.filter(c => !(K.get(c.id) || []).length);
+  let sub = '';
+  if(!ch.length) sub = edit ? addBtn(n.id) : '';
+  else if(leaves.length === ch.length && ch.length > 2) sub = `<div class="leaf-group">${ch.map(c => obox(c, edit)).join('')}${edit ? addBtn(n.id) : ''}</div>`;
+  else sub = `<ul>${ch.map(c => orgBranch(c, K, edit)).join('')}</ul>`;
+  return `<li>${obox(n, edit)}${sub}</li>`;
+}
+function orgChart(deptId, edit){
+  const K = kidsMap(deptId), roots = K.get(0) || [];
+  if(!roots.length) return '';
+  return `<div class="org-row">${roots.map(r => `<ul class="tree">${orgBranch(r, K, edit)}</ul>`).join('')}</div>`;
+}
+
 function viewOrg(){
   if(S.org && IDX.dept.has(S.org)) return viewTeam(S.org);
   const noDept = S.emps.filter(e => e.active && !IDX.dept.has(e.department_id)).length;
-  const cards = sortedDepts().map(d => {
-    const t = teamTree(d.id), st = teamStats(t.members);
-    const head = t.roots[0] && (t.size.get(t.roots[0].id)||1) > 1 ? t.roots[0] : null;
-    const faces = t.members.filter(e => e !== head).slice(0,5);
-    return `<button class="tcard" data-act="goto-org" data-dept="${d.id}">
-      <span class="tcard-top"><span class="tcard-code">${esc(d.name)}</span><span class="chip chip-plain">${t.members.length} хүн</span></span>
-      ${head ? `<span class="tcard-head">${avatar(head,'md')}<span style="min-width:0"><span class="p-name">${esc(head.full_name)}</span><span class="p-sub">${esc(head.position||'Удирдлага')}</span></span></span>`
-             : `<span class="note">Удирдлага тодорхойлоогүй</span>`}
-      ${statusBar(st)}
-      <span class="tcard-foot"><span class="faces">${faces.map(e => avatar(e,'sm')).join('')}</span><span><b class="pct" style="color:var(--fg)">${st.pct}%</b> хүчинтэй${st.c.bad?` · <span style="color:var(--bad)">${st.c.bad} дууссан</span>`:''}</span></span>
-    </button>`;
+  const panels = sortedDepts().map(d => {
+    const members = S.emps.filter(e => e.active && e.department_id === d.id), st = teamStats(members), has = deptNodes(d.id).length;
+    const placed = deptNodes(d.id).filter(n => n.employee_id).length;
+    return `<section class="panel org-mini"><div class="panel-head"><h2 style="font-size:17px">${esc(d.name)}</h2>
+        <span class="chip chip-plain">${members.length} хүн</span><span class="chip chip-${st.c.bad ? 'bad' : 'ok'}">${st.pct}% хүчинтэй</span>
+        <button class="btn btn-sm" data-act="goto-org" data-dept="${d.id}" style="margin-left:auto">${canOrg() ? 'Нээх / засах' : 'Нээх'}</button></div>
+      ${has ? `<div class="org-scroll">${orgChart(d.id, false)}</div><div class="panel-body" style="padding-top:0"><p class="org-hint">${placed}/${members.length} хүн бүтцэд байрласан</p></div>`
+            : `<div class="panel-body"><p class="note">Бүтэц үүсгээгүй байна. ${canOrg() ? '"Нээх / засах" дарж загвараас эхлүүлнэ.' : ''}</p>${statusBar(st)}</div>`}
+    </section>`;
   }).join('');
-  return `<div class="page-head"><div><h1>Алба</h1><p>${S.depts.length} алба · алба дээр дарж бүтцийг нь харна</p></div>
-    <div class="actions"><button class="btn" data-act="nav" data-v="settings">Алба засах</button></div></div>
-  ${S.depts.length ? `<div class="tgrid">${cards}</div>` : '<div class="panel empty">Алба бүртгэгдээгүй байна. Тохиргоо хэсгээс нэмнэ үү.</div>'}
+  return `<div class="page-head"><div><h1>Алба</h1><p>${S.depts.length} албаны бүтэц${canOrg() ? ' · алба нээж хүмүүсээ чирж байрлуулна' : ''}</p></div>
+    ${S.admin ? '<div class="actions"><button class="btn" data-act="nav" data-v="settings">Алба нэмэх / засах</button></div>' : ''}</div>
+  ${S.depts.length ? `<div class="org-grid">${panels}</div>` : '<div class="panel empty">Алба бүртгэгдээгүй байна.</div>'}
   ${noDept ? `<p class="note">${noDept} ажилтан албанд хуваарилагдаагүй байна. <button class="btn-link" data-act="goto-emps" data-dept="">Ажилтнууд руу</button></p>` : ''}`;
 }
 
 function viewTeam(deptId){
-  const d = IDX.dept.get(deptId), t = teamTree(deptId), st = teamStats(t.members);
-  const onode = (e, head) => { const s = empStatus(e.id), n = (t.kids.get(e.id)||[]).length;
-    return `<button class="onode st-${s} ${head?'head':''}" data-act="profile" data-id="${e.id}" data-photo-drop="${e.id}" title="${esc(e.full_name)} — ${esc(e.position||'')} · ${ST[s]}">${avatarPick(e,'sm')}<span class="on-txt"><span class="on-name">${esc(e.full_name)}</span><span class="on-pos">${esc(e.position||'—')}</span></span>${n?`<span class="on-cnt" title="${n} шууд харьяалагдах">${n}</span>`:''}</button>`; };
-  const drawn = new Set();
-  const branch = (e, depth) => {
-    drawn.add(e.id);
-    const ch = (t.kids.get(e.id)||[]).filter(c => !drawn.has(c.id));
-    const leaves = ch.filter(c => !(t.kids.get(c.id)||[]).length), inner = ch.filter(c => (t.kids.get(c.id)||[]).length);
-    leaves.forEach(c => drawn.add(c.id));
-    const group = (l, top = true) => `<div class="leaf-group"${top ? '' : ' style="margin-top:0"'}>${l.map(c => onode(c)).join('')}</div>`;
-    let sub = '';
-    if(ch.length){
-      if(!inner.length && leaves.length > 3) sub = group(leaves);
-      else sub = `<ul>${inner.map(c => branch(c, depth+1)).join('')}${leaves.length > 3 ? `<li>${group(leaves, false)}</li>` : leaves.map(c => `<li>${onode(c)}</li>`).join('')}</ul>`;
-    }
-    return `<li>${onode(e, depth === 0)}${sub}</li>`;
-  };
-  const trees = t.roots.filter(r => (t.size.get(r.id)||1) > 1), loose = t.roots.filter(r => (t.size.get(r.id)||1) === 1);
-  const ext = r => { const m = r.manager_id && IDX.emp.get(r.manager_id); return m ? `<div class="ext-mgr">${I.up}<span>Удирдлага: <button class="btn-link" data-act="profile" data-id="${m.id}">${esc(m.full_name)}</button> (${esc(deptName(m.department_id))})</span></div>` : ''; };
+  const d = IDX.dept.get(deptId), edit = canOrg();
+  const members = S.emps.filter(e => e.active && e.department_id === deptId), st = teamStats(members);
+  const placed = placedIds(), pool = members.filter(e => !placed.has(e.id)).sort((a, b) => (a.position||'').localeCompare(b.position||'') || a.full_name.localeCompare(b.full_name));
+  const has = deptNodes(deptId).length, tpl = tplFor(d);
   const tile = (cls, lbl, val, sub, stv) => `<button class="tile ${cls}" data-act="goto-trs" data-st="${stv}" data-dept="${deptId}"><span class="t-lbl">${lbl}</span><span class="t-num">${val}</span><span class="t-sub">${sub}</span></button>`;
-  return `<div class="page-head"><div class="org-head"><button class="btn btn-sm" data-act="org-back">${I.back}Бүх алба</button><div><h1>${esc(d.name)}</h1><p>${t.members.length} идэвхтэй ажилтан${trees[0] ? ' · Удирдлага: '+esc(trees[0].full_name) : ''}</p></div></div>
-    <div class="actions"><button class="btn" data-act="goto-emps" data-dept="${deptId}">Жагсаалтаар харах</button><button class="btn btn-primary" data-act="new-emp" data-dept="${deptId}">+ Ажилтан нэмэх</button></div></div>
+  return `<div class="page-head"><div class="org-head"><button class="btn btn-sm" data-act="org-back">${I.back}Бүх алба</button><div><h1>${esc(d.name)}</h1><p>${members.length} идэвхтэй ажилтан · ${members.length - pool.length} нь бүтцэд байрласан</p></div></div>
+    <div class="actions"><button class="btn" data-act="goto-emps" data-dept="${deptId}">Жагсаалтаар харах</button>${S.admin ? `<button class="btn btn-primary" data-act="new-emp" data-dept="${deptId}">+ Ажилтан нэмэх</button>` : ''}</div></div>
   <div class="tiles">
     ${tile('ok','Хүчинтэй сургалт', st.c.ok, `Нийт ${st.tot}-аас ${st.pct}%`, 'ok')}
     ${tile('warn',`${warnDays()} хоногт дуусах`, st.c.warn, 'Сануулга илгээгдэнэ', 'warn')}
     ${tile('bad','Хугацаа дууссан', st.c.bad, 'Давтан сургалт шаардлагатай', 'bad')}
-    ${tile('','Сургалтгүй ажилтан', t.members.filter(e => !(IDX.byEmp.get(e.id)||[]).length).length, 'Нэг ч бүртгэлгүй', 'none')}
+    ${tile('','Сургалтгүй ажилтан', members.filter(e => !(IDX.byEmp.get(e.id)||[]).length).length, 'Нэг ч бүртгэлгүй', 'none')}
   </div>
-  <section class="panel"><div class="panel-head"><h2>Бүтэц</h2><div class="legend"><span><i style="background:var(--ok)"></i>Бүх сургалт хүчинтэй</span><span><i style="background:var(--warn)"></i>Дуусах дөхсөн</span><span><i style="background:var(--bad)"></i>Дууссан</span><span><i style="background:var(--none)"></i>Сургалтгүй</span></div></div>
-    ${trees.length ? `<div class="org-scroll">${trees.map(r => `<div style="display:flex;flex-direction:column;align-items:center;gap:16px;margin-bottom:28px">${ext(r)}<ul class="tree">${branch(r, 0)}</ul></div>`).join('')}</div>`
-      : `<div class="panel-body"><p class="note">Энэ албанд удирдлагын шатлал тохируулаагүй байна. Ажилтны профайл → <b>Мэдээлэл засах</b> → <b>Шууд удирдлага</b> талбарыг бөглөхөд бүтэц энд автоматаар зурагдана.</p></div>`}
+  <section class="panel"><div class="panel-head"><h2>Бүтэц</h2>
+      ${edit && has ? `<div class="org-tools"><button class="btn btn-sm" data-act="org-add-root" data-dept="${deptId}">+ Дээд түвшинд нэмэх</button><button class="btn btn-sm" data-act="org-auto" data-dept="${deptId}" title="Хайрцагны нэр ажилтны албан тушаалтай таарвал автоматаар байрлуулна">Албан тушаалаар нь байрлуулах</button><button class="btn btn-sm btn-danger" data-act="org-clear" data-dept="${deptId}">Бүтцийг цэвэрлэх</button></div>` : ''}</div>
+    ${has ? `<div class="org-scroll">${orgChart(deptId, edit)}</div>
+      ${edit ? '<div class="panel-body" style="padding-top:0"><p class="org-hint">Хүнийг чирж өөр хайрцаг руу зөөнө (хоёр хүн байр солино) · хайрцгийн цэнхэр толгойноос чирж бүхэл хэсгийг өөр хүний доор зөөнө · <b>+</b> дарж доор нь хайрцаг нэмнэ, хүнийг <b>+</b> руу чирвэл шинэ хайрцаг үүсч байрлана · <b>⋯</b> дарж нэр солих, хүн сонгох, устгана.</p></div>' : ''}`
+      : `<div class="panel-body" style="display:flex;flex-direction:column;gap:12px;align-items:flex-start">
+          <p class="note">Энэ албанд бүтэц үүсгээгүй байна.</p>
+          ${edit ? `<div class="org-tools">${tpl ? `<button class="btn btn-primary" data-act="org-tpl" data-dept="${deptId}">Загвараар үүсгэх</button>` : ''}<button class="btn" data-act="org-add-root" data-dept="${deptId}">Хоосноос эхлэх</button></div>` : ''}
+        </div>`}
   </section>
-  ${loose.length ? `<section class="panel"><div class="panel-head"><h2>${trees.length ? 'Удирдлага тодорхойлоогүй' : 'Ажилтнууд'}</h2><span class="chip chip-plain">${loose.length}</span></div>
-    <div class="panel-body">${loose.some(r => r.manager_id && IDX.emp.has(r.manager_id)) ? '<p class="note" style="margin-bottom:10px">Зарим нь өөр албаны удирдлагад харьяалагддаг.</p>' : ''}<div class="loose">${loose.map(r => onode(r)).join('')}</div></div></section>` : ''}`;
+  <section class="panel" ${edit ? 'data-drop-pool="1"' : ''}><div class="panel-head"><h2>Бүтцэд байрлаагүй ажилтнууд</h2><span class="chip chip-plain">${pool.length}</span></div>
+    <div class="panel-body">${edit && pool.length ? '<p class="org-hint" style="margin-bottom:8px">Хүнийг бүтэц дээрх хайрцаг эсвэл <b>+</b> руу чирнэ. Бүтцээс хасах бол хүнийг энд буцааж чирнэ.</p>' : ''}
+      <div class="pool">${pool.length ? pool.map(e => `<span class="pchip" ${edit ? `draggable="true" data-drag-emp="${e.id}"` : ''} data-act="profile" data-id="${e.id}" title="${esc(e.position||'')}">${avatar(e,'sm')}${esc(e.full_name)} <span class="muted" style="font-size:11px">${esc(e.position||'')}</span></span>`).join('') : '<span class="note">Бүх ажилтан бүтцэд байрласан.</span>'}</div></div></section>`;
 }
 
+/* --- org: үйлдлүүд --- */
+async function orgCreate(deptId, spec, parentId, sort){
+  const [title, kids] = spec;
+  const n = await dbInsert('org_nodes', { department_id:deptId, parent_id:parentId ?? null, title:title || null, sort:sort ?? 0 });
+  for(const [i, k] of (kids || []).entries()) await orgCreate(deptId, k, n.id, i);
+  return n;
+}
+const nextSort = (deptId, pid) => Math.max(-1, ...deptNodes(deptId).filter(n => (n.parent_id ?? null) === (pid ?? null)).map(n => n.sort ?? 0)) + 1;
+async function orgAssign(nodeId, empId, swap){
+  const target = S.nodes.find(n => n.id === nodeId); if(!target || target.employee_id === empId) return;
+  const from = empId ? S.nodes.find(n => n.employee_id === empId) : null, prev = target.employee_id;
+  if(from) await dbUpdate('org_nodes', from.id, { employee_id:null });
+  if(prev && empId) await dbUpdate('org_nodes', nodeId, { employee_id:null });
+  await dbUpdate('org_nodes', nodeId, { employee_id:empId || null });
+  if(swap && from && prev) await dbUpdate('org_nodes', from.id, { employee_id:prev });
+}
+const isInside = (id, root) => { let n = S.nodes.find(x => x.id === id); const seen = new Set(); while(n && !seen.has(n.id)){ if(n.id === root) return true; seen.add(n.id); n = S.nodes.find(x => x.id === n.parent_id); } return false; };
+async function orgMove(id, parentId){
+  const n = S.nodes.find(x => x.id === id); if(!n || id === parentId || n.parent_id === parentId) return;
+  if(parentId && isInside(parentId, id)) return toast('Хайрцгийг өөрийн доод хэсэг рүү зөөх боломжгүй', 'bad');
+  await dbUpdate('org_nodes', id, { parent_id:parentId ?? null, sort:nextSort(n.department_id, parentId) });
+}
+async function orgDelete(id){
+  const n = S.nodes.find(x => x.id === id); if(!n) return;
+  const ch = S.nodes.filter(x => x.parent_id === id).sort(nodeSort); let s0 = nextSort(n.department_id, n.parent_id);
+  for(const c of ch) await dbUpdate('org_nodes', c.id, { parent_id:n.parent_id ?? null, sort:s0++ }); // доорх хайрцгууд дээш шилжинэ
+  await dbDelete('org_nodes', id);
+}
+function orgEditForm(n){
+  const e = n.employee_id && IDX.emp.get(n.employee_id), placed = placedIds();
+  const opt = x => `<option value="${x.id}" ${x.id === n.employee_id ? 'selected' : ''}>${esc(x.full_name)}${x.position ? ' — ' + esc(x.position) : ''}${placed.has(x.id) && x.id !== n.employee_id ? ' (өөр хайрцагт)' : ''}</option>`;
+  const act = S.emps.filter(x => x.active).sort((a, b) => a.full_name.localeCompare(b.full_name));
+  const mine = act.filter(x => x.department_id === n.department_id), free = mine.filter(x => !placed.has(x.id) || x.id === n.employee_id), busy = mine.filter(x => placed.has(x.id) && x.id !== n.employee_id), other = act.filter(x => x.department_id !== n.department_id);
+  return `<form data-form="org-node" style="display:flex;flex-direction:column;gap:12px"><input type="hidden" name="id" value="${n.id}">
+    <div class="field"><label for="on-title">Албан тушаал (хайрцгийн нэр)</label><input class="inp" id="on-title" name="title" value="${esc(n.title||'')}" placeholder="Жишээ нь: Shift Master. Хоосон бол 'Ажилтан'"></div>
+    <div class="field"><label for="on-emp">Ажилтан</label><select class="inp" id="on-emp" name="employee_id"><option value="">— Сул орон тоо —</option>
+      ${free.length ? `<optgroup label="${esc(deptName(n.department_id))} · байрлаагүй">${free.map(opt).join('')}</optgroup>` : ''}
+      ${busy.length ? `<optgroup label="${esc(deptName(n.department_id))} · өөр хайрцагт байгаа (зөөгдөнө)">${busy.map(opt).join('')}</optgroup>` : ''}
+      ${other.length ? `<optgroup label="Бусад алба">${other.map(opt).join('')}</optgroup>` : ''}</select></div>
+    <div class="m-foot" style="justify-content:space-between"><span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-danger" type="button" data-act="org-del" data-id="${n.id}">Хайрцгийг устгах</button><button class="btn" type="button" data-act="org-add" data-parent="${n.id}">+ Доор нь нэмэх</button></span>
+      <span style="display:flex;gap:8px"><button class="btn" type="button" data-act="close">Болих</button><button class="btn btn-primary" type="submit">Хадгалах</button></span></div></form>`;
+}
+async function orgAuto(deptId){
+  const placed = placedIds(), K = kidsMap(deptId), order = [], q = [...(K.get(0) || [])];
+  while(q.length){ const n = q.shift(); order.push(n); q.push(...(K.get(n.id) || [])); }
+  const pool = S.emps.filter(e => e.active && e.department_id === deptId && !placed.has(e.id));
+  let c = 0;
+  for(const n of order){
+    if(n.employee_id || !n.title?.trim()) continue;
+    const t = normKey(n.title), i = pool.findIndex(e => { const p = normKey(e.position || ''); return p && (p === t || p.includes(t) || t.includes(p)); });
+    if(i < 0) continue; await dbUpdate('org_nodes', n.id, { employee_id:pool[i].id }); pool.splice(i, 1); c++;
+  }
+  return c;
+}
+
+/* drag & drop */
+let DRAG = null;
+document.addEventListener('dragstart', ev => {
+  const p = ev.target.closest?.('[data-drag-emp]'), b = !p && ev.target.closest?.('[data-drag-node]');
+  if(!p && !b) return;
+  DRAG = p ? { type:'emp', emp:Number(p.dataset.dragEmp), from:p.dataset.from ? Number(p.dataset.from) : null } : { type:'node', id:Number(b.dataset.dragNode) };
+  ev.dataTransfer.effectAllowed = 'move'; try{ ev.dataTransfer.setData('text/plain', JSON.stringify(DRAG)); } catch{}
+  ev.stopPropagation();
+});
+document.addEventListener('dragend', () => { DRAG = null; $$('.drop-ok').forEach(x => x.classList.remove('drop-ok')); });
+const dropTarget = el => el.closest?.('[data-drop-node],[data-drop-add]') || (DRAG?.type === 'emp' && DRAG.from ? el.closest?.('[data-drop-pool]') : null);
+document.addEventListener('dragover', ev => { if(!DRAG) return; const t = dropTarget(ev.target); if(!t) return; ev.preventDefault(); $$('.drop-ok').forEach(x => x !== t && x.classList.remove('drop-ok')); t.classList.add('drop-ok'); });
+document.addEventListener('drop', async ev => {
+  if(!DRAG) return; const t = dropTarget(ev.target); if(!t) return; ev.preventDefault(); ev.stopPropagation();
+  const d = DRAG; DRAG = null; t.classList.remove('drop-ok');
+  await run(async () => {
+    if(t.dataset.dropPool){ if(d.from) await dbUpdate('org_nodes', d.from, { employee_id:null }); }
+    else if(t.dataset.dropAdd){ const pid = Number(t.dataset.dropAdd), p = S.nodes.find(n => n.id === pid);
+      if(d.type === 'node') await orgMove(d.id, pid);
+      else { const emp = IDX.emp.get(d.emp), from = S.nodes.find(n => n.employee_id === d.emp); if(from) await dbUpdate('org_nodes', from.id, { employee_id:null });
+        await dbInsert('org_nodes', { department_id:p.department_id, parent_id:pid, title:emp?.position || null, employee_id:d.emp, sort:nextSort(p.department_id, pid) }); } }
+    else { const nid = Number(t.dataset.dropNode); if(d.type === 'node') await orgMove(d.id, nid); else await orgAssign(nid, d.emp, true); }
+  });
+  render();
+});
 /* --- employees --- */
 function viewEmps(){
   const f = S.ef;
@@ -1506,6 +1650,19 @@ const ACT = {
   'del-admin': async a => { const em = a.dataset.email; if(!await askConfirm(`${em}-ийн админ эрхийг хасах уу? Тэр зөвхөн харах эрхтэй болно.`, 'Хасах')) return;
     await run(async () => { if(!DEMO){ const { error } = await sb.from('app_admins').delete().eq('email', em); if(error) throw error; } S.admins = S.admins.filter(x => x.email !== em); render(); }, 'Эрх хасагдлаа'); },
   'bp-apply': a => applyBulkPhotos(a),
+  'org-edit': a => { const n = S.nodes.find(x => x.id === Number(a.dataset.id)); if(n) openModal({ title:'Хайрцаг засах', body:orgEditForm(n) }); },
+  'org-add': async a => { const pid = Number(a.dataset.parent), p = S.nodes.find(n => n.id === pid); if(!p) return;
+    const n = await run(() => dbInsert('org_nodes', { department_id:p.department_id, parent_id:pid, title:null, sort:nextSort(p.department_id, pid) })); if(n){ closeModal(); render(); openModal({ title:'Шинэ хайрцаг', body:orgEditForm(n) }); } },
+  'org-add-root': async a => { const did = Number(a.dataset.dept);
+    const n = await run(() => dbInsert('org_nodes', { department_id:did, parent_id:null, title:deptNodes(did).length ? null : 'Manager', sort:nextSort(did, null) })); if(n){ render(); openModal({ title:'Шинэ хайрцаг', body:orgEditForm(n) }); } },
+  'org-del': async a => { const id = Number(a.dataset.id), k = S.nodes.filter(n => n.parent_id === id).length;
+    if(!await askConfirm(`Энэ хайрцгийг устгах уу?${k ? ` Доорх ${k} хайрцаг нэг шат дээш шилжинэ.` : ''} Ажилтан өөрөө устахгүй.`)) return;
+    if(await run(async () => { await orgDelete(id); return true; }, 'Хайрцаг устгагдлаа')){ closeModal(); render(); } },
+  'org-tpl': async a => { const did = Number(a.dataset.dept), tpl = tplFor(IDX.dept.get(did)); if(!tpl) return; a.disabled = true;
+    const ok = await run(async () => { for(const [i, sp] of tpl.entries()) await orgCreate(did, sp, null, i); const c = await orgAuto(did); return c; }, c => `Бүтэц үүслээ${c ? `, ${c} хүнийг албан тушаалаар нь байрлууллаа` : ''}`); a.disabled = false; render(); },
+  'org-auto': async a => { a.disabled = true; await run(() => orgAuto(Number(a.dataset.dept)), c => c ? `${c} хүнийг албан тушаалаар нь байрлууллаа` : 'Таарах албан тушаал олдсонгүй'); render(); },
+  'org-clear': async a => { const did = Number(a.dataset.dept); if(!await askConfirm(`${deptName(did)} албаны бүтцийг бүхэлд нь устгах уу? Ажилтнууд устахгүй, зөвхөн хайрцгууд арилна.`, 'Цэвэрлэх')) return;
+    await run(() => dbDeleteMany('org_nodes', deptNodes(did).map(n => n.id)), 'Бүтэц цэвэрлэгдлээ'); render(); },
   'imp-apply': async a => { a.disabled = true; a.textContent = 'Оруулж байна…';
     const r = await run(applyImport); if(!r){ a.disabled = false; a.textContent = 'Оруулах'; return; }
     S.imp = null; closeModal(); render();
@@ -1601,11 +1758,14 @@ const FORMS = {
     render();
   },
   'add-dept': async f => { const n = f.name.value.trim(); await run(async () => { await dbInsert('departments', { name:n, sort:S.depts.length+1 }); render(); }, 'Алба нэмэгдлээ'); },
+  'org-node': async f => { const id = Number(f.id.value);
+    const r = await run(async () => { await dbUpdate('org_nodes', id, { title:f.title.value.trim() || null }); await orgAssign(id, num(f.employee_id.value), false); return true; }, 'Хадгалагдлаа');
+    if(r){ closeModal(); render(); } },
   'add-admin': async f => { const em = f.email.value.trim().toLowerCase(); if(S.admins.some(a => a.email === em)) return toast('Аль хэдийн админ байна','bad');
     await run(async () => { let row = { email:em }; if(!DEMO){ const { data, error } = await sb.from('app_admins').insert(row).select().single(); if(error) throw error; row = data; } S.admins.push(row); render(); }, 'Админ нэмэгдлээ'); },
   'add-type': async f => { const n = f.name.value.trim(), m = Number(f.months.value)||12; await run(async () => { await dbInsert('training_types', { name:n, validity_months:m }); render(); }, 'Сургалт нэмэгдлээ'); }
 };
-document.addEventListener('submit', ev => { const f = ev.target; if(!f.dataset.form) return; ev.preventDefault(); if(!S.admin && f.dataset.form !== 'login') return denied(); FORMS[f.dataset.form]?.(f); });
+document.addEventListener('submit', ev => { const f = ev.target; if(!f.dataset.form) return; ev.preventDefault(); if(!S.admin && !['login','org-node'].includes(f.dataset.form)) return denied(); FORMS[f.dataset.form]?.(f); });
 
 /* ---------- boot ---------- */
 async function start(){
