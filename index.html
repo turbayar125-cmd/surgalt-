@@ -179,7 +179,7 @@ textarea.inp{resize:vertical;min-height:70px}
 /* Харах эрхтэй хэрэглэгчид засах товчнуудыг нууна */
 body.ro [data-act="new-emp"],body.ro [data-act="edit-emp"],body.ro [data-act="del-emp"],body.ro [data-act="new-tr"],body.ro [data-act="edit-tr"],
 body.ro [data-act="del-tr"],body.ro [data-act="renew"],body.ro [data-act="bulk"],body.ro [data-act="send-now"],body.ro [data-act="del-dept"],
-body.ro [data-act="del-type"],body.ro [data-act="del-admin"],body.ro label:has(> input[data-import]),body.ro label:has(> input[data-photo]),
+body.ro [data-act="del-type"],body.ro [data-act="del-admin"],body.ro label:has(> input[data-import]),body.ro label:has(> input[data-bulkphoto]),body.ro label:has(> input[data-photo]),
 body.ro .tbl td.num:has([data-act="renew"]),body.ro .tr-act,body.ro .drop,body.ro .prof-top .actions{display:none!important}
 .role{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;border-radius:999px;padding:2px 9px;align-self:flex-start}
 .role.adm{background:#2a3a58;color:#cfe0ff} .role.view{background:#22303a;color:#bfe3cf}
@@ -459,6 +459,70 @@ async function setPhoto(id, file){
   if(r) refresh();
 }
 
+/* ---------- олон зураг нэг дор ---------- */
+let ZIP_P = null;
+const loadZip = () => window.JSZip ? Promise.resolve(window.JSZip) : (ZIP_P ||= new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; sc.onload = () => res(window.JSZip); sc.onerror = () => { ZIP_P = null; rej(new Error('ZIP уншигч ачаалагдсангүй. Интернэт холболтоо шалгана уу.')); }; document.head.appendChild(sc); }));
+const IMG_RE = /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i;
+async function collectImages(files){
+  const out = [];
+  for(const f of files){
+    if(/\.zip$/i.test(f.name)){
+      const Z = await loadZip(); const z = await Z.loadAsync(f);
+      for(const e of Object.values(z.files)) if(!e.dir && IMG_RE.test(e.name) && !/(^|\/)(__MACOSX|\.)/.test(e.name)){
+        const ext = e.name.split('.').pop().toLowerCase(), type = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+        out.push({ name:e.name.split('/').pop(), blob:new Blob([await e.async('arraybuffer')], { type }) });
+      }
+    } else if(IMG_RE.test(f.name) || /^image\//.test(f.type)) out.push({ name:f.name, blob:f });
+  }
+  return out;
+}
+// Файлын нэрээр ажилтныг олно: "01009555.jpg", "1009555.jpg", "Amartuvshin Batzaya.jpg", "01009555 Amartuvshin.jpg"…
+function matchPhoto(fname){
+  const base = fname.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').trim();
+  const digits = (base.match(/\d{4,}/) || [])[0];
+  if(digits){ const d = digits.replace(/^0+/, ''); const e = S.emps.find(x => x.emp_code && String(x.emp_code).replace(/\D/g, '').replace(/^0+/, '') === d); if(e) return e; }
+  const nm = cleanName(base.replace(/\d+/g, ' ').replace(/[-.]+/g, ' ').replace(/\s+/g, ' ').trim()); if(!nm) return null;
+  const k = normKey(nm), w = nm.toLowerCase().split(' ').filter(Boolean);
+  let c = S.emps.filter(x => normKey(x.full_name) === k);
+  if(!c.length && w.length >= 2) c = S.emps.filter(x => { const xw = cleanName(x.full_name).toLowerCase().split(/\s+/); return w.every(t => xw.includes(t)); }); // үгийн дараалал өөр байсан ч
+  if(c.length > 1) c = c.filter(x => x.active);
+  return c.length === 1 ? c[0] : null;
+}
+async function startBulkPhotos(files){
+  if(!files?.length) return;
+  openModal({ title:'Зураг уншиж байна', body:'<div style="display:grid;place-items:center;padding:24px"><div class="spinner"></div></div>' });
+  try{
+    const imgs = await collectImages([...files]);
+    if(!imgs.length) throw new Error('Зураг олдсонгүй (jpg, png эсвэл тэдгээрийг агуулсан zip сонгоно уу)');
+    const matched = new Map(), miss = [], dup = [];
+    for(const im of imgs){ const e = matchPhoto(im.name); if(!e){ miss.push(im.name); continue; } if(matched.has(e.id)) dup.push(im.name); matched.set(e.id, { e, ...im }); }
+    S.bp = { list:[...matched.values()], miss, dup, overwrite:true };
+    renderBulkPhotos();
+  } catch(e){ console.error(e); closeModal(); toast(e.message || String(e), 'bad'); }
+}
+function renderBulkPhotos(){
+  const b = S.bp, has = b.list.filter(x => x.e.photo_url).length, n = b.overwrite ? b.list.length : b.list.length - has;
+  const noPhoto = S.emps.filter(e => e.active && !e.photo_url && !b.list.some(x => x.e.id === e.id)).length;
+  openModal({ title:'Зураг олноор оруулах', wide:true, body:`
+    <div class="imp-sum"><div><b>${b.list.length}</b><span>Ажилтантай тааруулсан</span></div><div><b>${b.miss.length}</b><span>Тааруулж чадаагүй</span></div><div><b>${has}</b><span>Аль хэдийн зурагтай</span></div><div><b>${noPhoto}</b><span>Зураггүй үлдэх</span></div></div>
+    ${b.list.length ? `<details class="hist" open><summary>Тааруулсан (${b.list.length})</summary><div class="chips-row" style="margin-top:8px;max-height:200px;overflow:auto">${b.list.map(x => `<span class="pchip" title="${esc(x.name)}">${avatar(x.e,'sm')}${esc(x.e.full_name)}</span>`).join('')}</div></details>` : ''}
+    ${b.miss.length ? `<details class="hist"><summary style="color:var(--bad)">Тааруулж чадаагүй файлууд (${b.miss.length})</summary><pre class="code" style="margin-top:6px;max-height:160px;overflow:auto;white-space:pre-wrap">${esc(b.miss.join('\n'))}</pre><p class="note" style="margin-top:6px">Файлын нэрийг ажилтны <b>Employee ID</b> (жишээ нь 01009555.jpg) эсвэл <b>нэрээр</b> (Amartuvshin Batzaya.jpg) өгнө үү.</p></details>` : ''}
+    ${b.dup.length ? `<p class="note">${b.dup.length} ажилтанд нэгээс олон зураг байсан тул сүүлийнхийг авлаа.</p>` : ''}
+    ${has ? `<label class="check"><input type="checkbox" data-bp="overwrite" ${b.overwrite ? 'checked' : ''}>Зурагтай байгаа ${has} ажилтны зургийг солих</label>` : ''}
+    <p class="note" id="bp-prog" style="margin:0"></p>
+    <div class="m-foot"><button class="btn" data-act="close">Болих</button><button class="btn btn-primary" data-act="bp-apply" ${n ? '' : 'disabled'}>${n} зураг оруулах</button></div>` });
+}
+async function applyBulkPhotos(btn){
+  const b = S.bp, todo = b.list.filter(x => b.overwrite || !x.e.photo_url); let ok = 0, fail = 0, i = 0;
+  const prog = () => { const el = $('#bp-prog'); if(el) el.textContent = `Оруулж байна… ${ok + fail}/${todo.length}${fail ? ` (${fail} алдаа)` : ''}`; };
+  btn.disabled = true; prog();
+  const worker = async () => { while(i < todo.length){ const x = todo[i++]; try{ await uploadPhoto(x.e.id, x.blob); ok++; } catch(e){ console.warn(x.name, e); fail++; if(fail === 1) toast(errMsg(e), 'bad'); } prog(); } };
+  await Promise.all([worker(), worker(), worker()]);
+  S.bp = null; closeModal(); render();
+  toast(`${ok} зураг хадгалагдлаа${fail ? `, ${fail} алдаатай` : ''}`, fail ? 'bad' : '');
+}
+const bulkPhotoBtn = () => `<label class="btn" style="cursor:pointer" title="Олон зураг эсвэл zip файл сонгоно. Файлын нэр нь Employee ID эсвэл ажилтны нэр байна.">Зураг олноор оруулах<input type="file" accept="image/*,.zip,application/zip" multiple data-bulkphoto hidden></label>`;
+
 /* ---------- data layer ---------- */
 async function fetchAll(table){
   const out = []; const step = 1000;
@@ -547,7 +611,8 @@ function resizeImage(file, size=360){
 async function uploadPhoto(empId, file){
   const { blob, dataUrl } = await resizeImage(file);
   if(DEMO) return dbUpdate('employees', empId, { photo_url:dataUrl });
-  const path = `emp-${empId}-${Date.now()}.jpg`;
+  const code = String(IDX.emp.get(empId)?.emp_code || '').replace(/[^\w-]/g, '');
+  const path = `${code ? 'code-' + code : 'emp-' + empId}-${Date.now()}.jpg`;
   const { error } = await sb.storage.from('photos').upload(path, blob, { contentType:'image/jpeg', upsert:false }); // нэр нь давтагдахгүй тул дарж бичих шаардлагагүй
   if(error) throw error;
   const { data } = sb.storage.from('photos').getPublicUrl(path);
@@ -790,7 +855,7 @@ function viewTeam(deptId){
 function viewEmps(){
   const f = S.ef;
   return `<div class="page-head"><div><h1>Ажилтнууд</h1><p>Профайл, зураг, сургалтын түүх</p></div>
-    <div class="actions">${importBtn()}<button class="btn btn-primary" data-act="new-emp">+ Ажилтан нэмэх</button></div></div>
+    <div class="actions">${importBtn()}${bulkPhotoBtn()}<button class="btn btn-primary" data-act="new-emp">+ Ажилтан нэмэх</button></div></div>
   <div class="toolbar">
     <input class="inp search" id="ef-q" type="search" placeholder="Нэр, код, албан тушаал, имэйлээр хайх" value="${esc(f.q)}" data-filter="ef" data-key="q" aria-label="Хайх">
     <select class="inp" id="ef-dept" data-filter="ef" data-key="dept" aria-label="Алба"><option value="">Бүх алба</option>${sortedDepts().map(d => `<option value="${d.id}" ${f.dept==d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select>
@@ -924,7 +989,7 @@ function openModal({ title, body, wide=false, drawer=false }){
     <header class="m-head"><h2>${esc(title)}</h2><button class="icon-btn" data-act="close" aria-label="Хаах">×</button></header><div class="m-body">${body}</div></div></div>`;
   const first = $('#modal-root .m-body input:not([type=hidden]):not([type=file]), #modal-root .m-body select'); if(first && !drawer) first.focus();
 }
-function closeModal(){ $('#modal-root').innerHTML = ''; S.openEmp = null; S.imp = null; }
+function closeModal(){ $('#modal-root').innerHTML = ''; S.openEmp = null; S.imp = null; S.bp = null; }
 function askConfirm(msg, okLabel='Устгах'){
   return new Promise(res => {
     const root = $('#confirm-root');
@@ -1440,6 +1505,7 @@ const ACT = {
     inp.onchange = () => setPhoto(id, inp.files[0]); inp.click(); },
   'del-admin': async a => { const em = a.dataset.email; if(!await askConfirm(`${em}-ийн админ эрхийг хасах уу? Тэр зөвхөн харах эрхтэй болно.`, 'Хасах')) return;
     await run(async () => { if(!DEMO){ const { error } = await sb.from('app_admins').delete().eq('email', em); if(error) throw error; } S.admins = S.admins.filter(x => x.email !== em); render(); }, 'Эрх хасагдлаа'); },
+  'bp-apply': a => applyBulkPhotos(a),
   'imp-apply': async a => { a.disabled = true; a.textContent = 'Оруулж байна…';
     const r = await run(applyImport); if(!r){ a.disabled = false; a.textContent = 'Оруулах'; return; }
     S.imp = null; closeModal(); render();
@@ -1455,7 +1521,7 @@ const ACT = {
     Object.assign(S, { ready:false, auth:'login', user:null, admin:false, admins:[], imports:[], depts:[], emps:[], trs:[], types:[], logs:[], view:'dash', org:null });
     closeModal(); document.body.classList.remove('ro'); render(); toast('Системээс гарлаа'); }
 };
-const ADMIN_ACTS = new Set(['undo-imp','wipe-all','new-emp','edit-emp','del-emp','new-tr','edit-tr','renew','del-tr','bulk','bulk-all','send-now','del-dept','del-type','pick-photo','imp-apply','del-admin']);
+const ADMIN_ACTS = new Set(['bp-apply','undo-imp','wipe-all','new-emp','edit-emp','del-emp','new-tr','edit-tr','renew','del-tr','bulk','bulk-all','send-now','del-dept','del-type','pick-photo','imp-apply','del-admin']);
 const denied = () => { toast('Танд засах эрх алга. Админтай холбогдоно уу.','bad'); };
 document.addEventListener('click', ev => { const a = ev.target.closest('[data-act]'); if(!a) return; if(!S.admin && ADMIN_ACTS.has(a.dataset.act)){ ev.preventDefault(); return denied(); } const f = ACT[a.dataset.act]; if(f){ if(a.tagName === 'A') ev.preventDefault(); f(a, ev); } });
 document.addEventListener('keydown', ev => {
@@ -1482,9 +1548,11 @@ document.addEventListener('input', ev => {
 });
 document.addEventListener('change', async ev => {
   const t = ev.target;
-  if(!S.admin && (t.dataset.photo || t.dataset.import || t.dataset.edit)){ t.value = ''; return denied(); }
+  if(!S.admin && (t.dataset.photo || t.dataset.import || t.dataset.edit || 'bulkphoto' in t.dataset)){ t.value = ''; return denied(); }
   if(t.dataset.photo && t.files[0]){ const id = Number(t.dataset.photo); await run(async () => { await uploadPhoto(id, t.files[0]); refresh(); }, 'Зураг хадгалагдлаа'); }
   if(t.dataset.import && t.files[0]){ const f = t.files[0]; t.value = ''; startImport(f); }
+  if('bulkphoto' in t.dataset && t.files.length){ const fs = [...t.files]; t.value = ''; startBulkPhotos(fs); }
+  if(t.dataset.bp === 'overwrite' && S.bp){ S.bp.overwrite = t.checked; renderBulkPhotos(); }
   if(t.dataset.imp && S.imp){
     const k = t.dataset.imp;
     if(k === 'sheet'){ S.imp.si = Number(t.value); S.imp.mode = null; parseCurrent(); }
