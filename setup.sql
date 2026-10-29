@@ -88,7 +88,7 @@ create table if not exists public.app_admins (
   added_at   timestamptz not null default now()
 );
 -- Анхны админ (өөр имэйл бол энд сольж ажиллуулна)
-insert into public.app_admins (email) values ('turbayar125@gmail.com') on conflict do nothing;
+insert into public.app_admins (email) values ('turbayar125@gmail.com'), ('turbayar.o@premiumconcrete.mn') on conflict do nothing;
 
 create or replace function public.is_admin() returns boolean
 language sql stable security definer set search_path = public as $$
