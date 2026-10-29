@@ -512,7 +512,7 @@ async function uploadPhoto(empId, file){
   const { blob, dataUrl } = await resizeImage(file);
   if(DEMO) return dbUpdate('employees', empId, { photo_url:dataUrl });
   const path = `emp-${empId}-${Date.now()}.jpg`;
-  const { error } = await sb.storage.from('photos').upload(path, blob, { contentType:'image/jpeg', upsert:true });
+  const { error } = await sb.storage.from('photos').upload(path, blob, { contentType:'image/jpeg', upsert:false }); // нэр нь давтагдахгүй тул дарж бичих шаардлагагүй
   if(error) throw error;
   const { data } = sb.storage.from('photos').getPublicUrl(path);
   return dbUpdate('employees', empId, { photo_url:data.publicUrl });
