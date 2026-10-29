@@ -320,30 +320,52 @@ pre.code{background:var(--surface-2);border-radius:7px;padding:10px 12px;font-fa
 .pchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:2px 10px 2px 2px;background:var(--surface);cursor:pointer;font-size:12.5px}
 .pchip:hover{border-color:var(--accent)}
 
-/* classic org chart */
-.org-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,520px),1fr));gap:14px}
-.org-mini .org-scroll{max-height:460px;overflow:auto;padding:14px 8px 16px}
-.org-mini .panel-head{gap:8px}
-.org-row{display:flex;gap:28px;justify-content:center;align-items:flex-start;min-width:max-content;margin:0 auto}
-.obox{width:150px;background:var(--surface);border:1px solid #3b65b5;border-radius:6px;overflow:hidden;position:relative;text-align:left;box-shadow:0 1px 2px rgba(20,40,90,.12)}
+/* classic org chart — нэг хэмжээ, нэг өнгө */
+.org-canvas{background:radial-gradient(circle, var(--line-2) 1px, transparent 1.2px) 0 0/18px 18px, var(--bg);border-top:1px solid var(--line-2);overflow:auto;padding:28px 20px 32px}
+.org-row{display:flex;gap:40px;justify-content:center;align-items:flex-start;min-width:max-content;margin:0 auto}
+.org-chart .tree,.org-chart .tree ul{padding-top:26px}
+.org-chart .tree{padding-top:0}
+.org-chart .tree li{padding:26px 8px 0}
+.org-chart .tree > li{padding-top:0}
+.org-chart .tree li::before,.org-chart .tree li::after{height:26px;border-color:var(--oc-line)}
+.org-chart .tree ul::before{height:26px;border-color:var(--oc-line)}
+.org-chart .tree li:last-child:not(:only-child)::before{border-right-color:var(--oc-line);border-top-right-radius:10px}
+.org-chart .tree li:first-child:not(:only-child)::after{border-top-left-radius:10px}
+.org-chart{--oc:#2f5fb3;--oc-soft:#eaf0fb;--oc-line:#aab8d3}
+:root[data-theme="dark"] .org-chart{--oc:#7aa5ef;--oc-soft:#1b2840;--oc-line:#3a4a66}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .org-chart{--oc:#7aa5ef;--oc-soft:#1b2840;--oc-line:#3a4a66}}
+.obox{width:188px;height:92px;flex:none;background:var(--surface);border:1px solid var(--line);border-radius:12px;position:relative;text-align:left;box-shadow:0 1px 2px rgba(16,32,64,.06),0 4px 14px rgba(16,32,64,.06);display:flex;flex-direction:column;overflow:hidden;transition:box-shadow .15s,border-color .15s,transform .15s}
+.obox::before{content:"";position:absolute;inset:0 0 auto 0;height:4px;background:var(--oc)}
+.obox:hover{border-color:var(--oc);box-shadow:0 2px 4px rgba(16,32,64,.08),0 10px 24px rgba(16,32,64,.12)}
 .obox[draggable="true"]{cursor:grab}
-.ob-title{background:#4472c4;color:#fff;font-size:10.5px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;padding:5px 22px 5px 8px;line-height:1.25;min-height:22px;overflow-wrap:anywhere}
-.ob-title.blank{background:#7f9bd3;font-style:italic;text-transform:none}
-.ob-person{display:flex;gap:7px;align-items:center;padding:6px 8px;border-left:3px solid var(--nc,transparent);cursor:pointer;min-height:40px}
-.ob-person:hover .on-name{color:var(--accent)}
-.ob-person.st-ok{--nc:var(--ok)} .ob-person.st-warn{--nc:var(--warn)} .ob-person.st-bad{--nc:var(--bad)} .ob-person.st-none{--nc:var(--none)}
-.ob-empty{display:flex;align-items:center;justify-content:center;width:100%;min-height:40px;border:0;background:none;color:var(--faint);font-size:12px;cursor:pointer}
-.ob-empty:hover{color:var(--accent);background:var(--accent-soft)}
+.obox.root{border-color:var(--oc)}
+.ob-title{flex:none;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--oc);padding:12px 30px 0 12px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ob-title.blank{color:var(--faint)}
+.ob-person{display:flex;gap:10px;align-items:center;padding:8px 12px 10px;cursor:pointer;flex:1;min-width:0}
+.ob-person .on-txt{min-width:0;display:flex;flex-direction:column;gap:1px}
+.ob-person .on-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ob-person .on-pos{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ob-person:hover .on-name{color:var(--oc)}
+.ob-av{position:relative;flex:none;display:inline-grid}
+.ob-av .av{width:38px;height:38px;font-size:13px}
+.ob-dot{position:absolute;right:-1px;bottom:-1px;width:11px;height:11px;border-radius:50%;border:2px solid var(--surface);background:var(--none)}
+.ob-dot.st-ok{background:var(--ok)} .ob-dot.st-warn{background:var(--warn)} .ob-dot.st-bad{background:var(--bad)}
+.ob-empty{display:flex;gap:10px;align-items:center;flex:1;padding:8px 12px 10px;border:0;background:none;color:var(--faint);font-size:12.5px;cursor:pointer;text-align:left;width:100%}
+.ob-empty i{width:38px;height:38px;border-radius:50%;border:1.5px dashed var(--oc-line);display:grid;place-items:center;font-style:normal;font-size:18px;color:var(--oc-line);flex:none}
+button.ob-empty:hover{color:var(--oc)} button.ob-empty:hover i{border-color:var(--oc);color:var(--oc);background:var(--oc-soft)}
 span.ob-empty{cursor:default}
-.ob-menu{position:absolute;top:1px;right:1px;border:0;background:none;color:#fff;width:20px;height:20px;border-radius:4px;cursor:pointer;font-size:14px;line-height:1;opacity:.85}
-.ob-menu:hover{background:rgba(255,255,255,.2);opacity:1}
-.ob-add{display:block;margin:0 auto;width:30px;height:30px;border:0;background:none;color:#3b65b5;font-size:26px;line-height:1;cursor:pointer;border-radius:6px;position:relative;margin-top:14px}
-.ob-add::before{content:"";position:absolute;top:-14px;left:50%;height:12px;border-left:1.5px solid var(--faint)}
-.ob-add:hover{background:var(--accent-soft)}
-.leaf-group .ob-add{margin-top:2px}.leaf-group .ob-add::before{display:none}
-.org-mini .obox{width:122px}.org-mini .ob-title{font-size:9.5px;padding:4px 6px}.org-mini .ob-person{padding:4px 6px;min-height:32px;gap:5px}
-.org-mini .on-name{font-size:11.5px}.org-mini .on-pos{display:none}.org-mini .av-sm{width:22px;height:22px;font-size:9px}.org-mini .ob-empty{min-height:30px;font-size:11px}
-.drop-ok{outline:2px dashed var(--accent)!important;outline-offset:2px;background:var(--accent-soft)}
+.ob-menu{position:absolute;top:7px;right:6px;border:0;background:none;color:var(--faint);width:24px;height:22px;border-radius:6px;cursor:pointer;font-size:15px;line-height:1;letter-spacing:1px}
+.ob-menu:hover{background:var(--oc-soft);color:var(--oc)}
+.ob-add{display:grid;place-items:center;margin:26px auto 0;width:28px;height:28px;border:1.5px solid var(--oc-line);background:var(--surface);color:var(--oc);font-size:18px;line-height:1;cursor:pointer;border-radius:50%;position:relative;opacity:.75;transition:opacity .15s,background .15s}
+.ob-add::before{content:"";position:absolute;top:-27px;left:50%;height:25px;border-left:1.5px dashed var(--oc-line)}
+.ob-add:hover{opacity:1;background:var(--oc-soft);border-color:var(--oc)}
+.org-chart .leaf-group{margin-top:26px;border:0;padding:0;gap:10px;background:none}
+.org-chart .leaf-group::before{top:-27px;height:26px;border-color:var(--oc-line)}
+.org-chart .leaf-group .obox{position:relative}
+.org-chart .leaf-group .obox:not(:first-child)::after{content:"";position:absolute;top:-11px;left:50%;height:10px;border-left:1.5px solid var(--oc-line)}
+.org-chart .leaf-group .ob-add{margin-top:4px}
+.org-chart .leaf-group .ob-add::before{top:-6px;height:5px}
+.drop-ok{outline:2px dashed var(--oc,var(--accent))!important;outline-offset:3px;background:var(--oc-soft,var(--accent-soft))}
 .pool{display:flex;flex-wrap:wrap;gap:6px;max-height:240px;overflow:auto;padding:2px;min-height:44px;border-radius:8px}
 .pool .pchip{cursor:grab}
 .org-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -745,7 +767,7 @@ function render(){
     <main class="main"><div class="wrap">${DEMO ? demoBar() : ''}${!DEMO && !S.admin ? '<div class="ro-note">Танд <b>зөвхөн харах</b> эрх байна (Алба цэсний бүтцийг засах боломжтой). Бусад мэдээлэл засах бол админтай холбогдоно уу.</div>' : ''}${VIEWS[S.view]()}</div></main>
   </div>`;
   // org chart: дээд удирдлагыг дэлгэцийн голд гаргана
-  $$('.org-scroll').forEach(el => { const h = el.querySelector('.onode.head'); if(!h) return; const a = el.getBoundingClientRect(), b = h.getBoundingClientRect(); el.scrollLeft += (b.left + b.width/2) - (a.left + a.width/2); });
+  $$('.org-scroll,.org-canvas').forEach(el => { const h = el.querySelector('.onode.head,.obox.root'); if(!h) return; const a = el.getBoundingClientRect(), b = h.getBoundingClientRect(); el.scrollLeft += (b.left + b.width/2) - (a.left + a.width/2); });
 }
 const demoBar = () => `<div class="demo-bar"><b>Демо горим.</b><span>Жишээ 150 ажилтантай. Өөрчлөлт хадгалагдахгүй, имэйл илгээгдэхгүй. Жинхэнээр ажиллуулах заавар: GitHub дээрх README файл.</span></div>`;
 
@@ -843,14 +865,14 @@ const ORG_TPL = {
 };
 const tplFor = d => ORG_TPL[normKey(d.name)] || null;
 
-function obox(n, edit){
+function obox(n, edit, root){
   const e = n.employee_id && IDX.emp.get(n.employee_id), st = e ? empStatus(e.id) : '';
   const title = n.title?.trim();
-  return `<div class="obox" data-drop-node="${n.id}" ${edit ? `draggable="true" data-drag-node="${n.id}"` : ''}>
-    <div class="ob-title ${title ? '' : 'blank'}">${title ? esc(title) : 'Ажилтан'}</div>
-    ${edit ? `<button class="ob-menu" data-act="org-edit" data-id="${n.id}" title="Засах" aria-label="Хайрцаг засах">⋯</button>` : ''}
-    ${e ? `<div class="ob-person st-${st}" data-act="profile" data-id="${e.id}" ${edit ? `draggable="true" data-drag-emp="${e.id}" data-from="${n.id}"` : ''} title="${esc(e.full_name)} · ${esc(e.position||'')} · ${ST[st]}">${avatar(e,'sm')}<span class="on-txt"><span class="on-name">${esc(e.full_name)}</span><span class="on-pos">${esc(e.position||'')}</span></span></div>`
-       : edit ? `<button class="ob-empty" data-act="org-edit" data-id="${n.id}">+ Хүн сонгох</button>` : `<span class="ob-empty">Сул орон тоо</span>`}
+  return `<div class="obox ${root ? 'root' : ''}" data-drop-node="${n.id}" ${edit ? `draggable="true" data-drag-node="${n.id}"` : ''}>
+    <div class="ob-title ${title ? '' : 'blank'}" title="${esc(title || 'Ажилтан')}">${title ? esc(title) : 'Ажилтан'}</div>
+    ${edit ? `<button class="ob-menu" data-act="org-edit" data-id="${n.id}" title="Засах" aria-label="Хайрцаг засах">•••</button>` : ''}
+    ${e ? `<div class="ob-person" data-act="profile" data-id="${e.id}" ${edit ? `draggable="true" data-drag-emp="${e.id}" data-from="${n.id}"` : ''} title="${esc(e.full_name)} · ${esc(e.position||'')} · ${ST[st]}"><span class="ob-av">${avatar(e,'sm')}<i class="ob-dot st-${st}"></i></span><span class="on-txt"><span class="on-name">${esc(e.full_name)}</span><span class="on-pos">${esc(e.position||'—')}</span></span></div>`
+       : edit ? `<button class="ob-empty" data-act="org-edit" data-id="${n.id}"><i>+</i>Хүн сонгох</button>` : `<span class="ob-empty"><i></i>Сул орон тоо</span>`}
   </div>`;
 }
 const addBtn = pid => `<button class="ob-add" data-act="org-add" data-parent="${pid}" data-drop-add="${pid}" title="Доор нь хайрцаг нэмэх (хүнийг энд чирч болно)" aria-label="Доор нь нэмэх">+</button>`;
@@ -860,30 +882,34 @@ function orgBranch(n, K, edit){
   if(!ch.length) sub = edit ? addBtn(n.id) : '';
   else if(leaves.length === ch.length && ch.length > 2) sub = `<div class="leaf-group">${ch.map(c => obox(c, edit)).join('')}${edit ? addBtn(n.id) : ''}</div>`;
   else sub = `<ul>${ch.map(c => orgBranch(c, K, edit)).join('')}</ul>`;
-  return `<li>${obox(n, edit)}${sub}</li>`;
+  return `<li>${obox(n, edit, !n.parent_id)}${sub}</li>`;
 }
 function orgChart(deptId, edit){
   const K = kidsMap(deptId), roots = K.get(0) || [];
   if(!roots.length) return '';
-  return `<div class="org-row">${roots.map(r => `<ul class="tree">${orgBranch(r, K, edit)}</ul>`).join('')}</div>`;
+  return `<div class="org-chart"><div class="org-row">${roots.map(r => `<ul class="tree">${orgBranch(r, K, edit)}</ul>`).join('')}</div></div>`;
 }
 
 function viewOrg(){
   if(S.org && IDX.dept.has(S.org)) return viewTeam(S.org);
   const noDept = S.emps.filter(e => e.active && !IDX.dept.has(e.department_id)).length;
-  const panels = sortedDepts().map(d => {
-    const members = S.emps.filter(e => e.active && e.department_id === d.id), st = teamStats(members), has = deptNodes(d.id).length;
-    const placed = deptNodes(d.id).filter(n => n.employee_id).length;
-    return `<section class="panel org-mini"><div class="panel-head"><h2 style="font-size:17px">${esc(d.name)}</h2>
-        <span class="chip chip-plain">${members.length} хүн</span><span class="chip chip-${st.c.bad ? 'bad' : 'ok'}">${st.pct}% хүчинтэй</span>
-        <button class="btn btn-sm" data-act="goto-org" data-dept="${d.id}" style="margin-left:auto">${canOrg() ? 'Нээх / засах' : 'Нээх'}</button></div>
-      ${has ? `<div class="org-scroll">${orgChart(d.id, false)}</div><div class="panel-body" style="padding-top:0"><p class="org-hint">${placed}/${members.length} хүн бүтцэд байрласан</p></div>`
-            : `<div class="panel-body"><p class="note">Бүтэц үүсгээгүй байна. ${canOrg() ? '"Нээх / засах" дарж загвараас эхлүүлнэ.' : ''}</p>${statusBar(st)}</div>`}
-    </section>`;
+  const cards = sortedDepts().map(d => {
+    const members = S.emps.filter(e => e.active && e.department_id === d.id), st = teamStats(members);
+    const root = (kidsMap(d.id).get(0) || []).find(n => n.employee_id);
+    const t = teamTree(d.id), mh = t.roots[0] && (t.size.get(t.roots[0].id)||1) > 1 ? t.roots[0] : null;
+    const head = root ? IDX.emp.get(root.employee_id) : mh;
+    const faces = members.filter(e => e !== head).slice(0,5);
+    return `<button class="tcard" data-act="goto-org" data-dept="${d.id}">
+      <span class="tcard-top"><span class="tcard-code">${esc(d.name)}</span><span class="chip chip-plain">${members.length} хүн</span></span>
+      ${head ? `<span class="tcard-head">${avatar(head,'md')}<span style="min-width:0"><span class="p-name">${esc(head.full_name)}</span><span class="p-sub">${esc(root?.title || head.position || 'Удирдлага')}</span></span></span>`
+             : `<span class="note">Удирдлага тодорхойлоогүй</span>`}
+      ${statusBar(st)}
+      <span class="tcard-foot"><span class="faces">${faces.map(e => avatar(e,'sm')).join('')}</span><span><b class="pct" style="color:var(--fg)">${st.pct}%</b> хүчинтэй${st.c.bad?` · <span style="color:var(--bad)">${st.c.bad} дууссан</span>`:''}</span></span>
+    </button>`;
   }).join('');
-  return `<div class="page-head"><div><h1>Алба</h1><p>${S.depts.length} албаны бүтэц${canOrg() ? ' · алба нээж хүмүүсээ чирж байрлуулна' : ''}</p></div>
+  return `<div class="page-head"><div><h1>Алба</h1><p>${S.depts.length} алба · алба дээр дарж бүтцийг нь харна</p></div>
     ${S.admin ? '<div class="actions"><button class="btn" data-act="nav" data-v="settings">Алба нэмэх / засах</button></div>' : ''}</div>
-  ${S.depts.length ? `<div class="org-grid">${panels}</div>` : '<div class="panel empty">Алба бүртгэгдээгүй байна.</div>'}
+  ${S.depts.length ? `<div class="tgrid">${cards}</div>` : '<div class="panel empty">Алба бүртгэгдээгүй байна.</div>'}
   ${noDept ? `<p class="note">${noDept} ажилтан албанд хуваарилагдаагүй байна. <button class="btn-link" data-act="goto-emps" data-dept="">Ажилтнууд руу</button></p>` : ''}`;
 }
 
@@ -901,9 +927,9 @@ function viewTeam(deptId){
     ${tile('bad','Хугацаа дууссан', st.c.bad, 'Давтан сургалт шаардлагатай', 'bad')}
     ${tile('','Сургалтгүй ажилтан', members.filter(e => !(IDX.byEmp.get(e.id)||[]).length).length, 'Нэг ч бүртгэлгүй', 'none')}
   </div>
-  <section class="panel"><div class="panel-head"><h2>Бүтэц</h2>
+  <section class="panel"><div class="panel-head"><div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><h2>Бүтэц</h2><div class="legend"><span><i style="background:var(--ok);border-radius:50%"></i>Хүчинтэй</span><span><i style="background:var(--warn);border-radius:50%"></i>Дөхсөн</span><span><i style="background:var(--bad);border-radius:50%"></i>Дууссан</span><span><i style="background:var(--none);border-radius:50%"></i>Сургалтгүй</span></div></div>
       ${edit && has ? `<div class="org-tools"><button class="btn btn-sm" data-act="org-add-root" data-dept="${deptId}">+ Дээд түвшинд нэмэх</button><button class="btn btn-sm" data-act="org-auto" data-dept="${deptId}" title="Хайрцагны нэр ажилтны албан тушаалтай таарвал автоматаар байрлуулна">Албан тушаалаар нь байрлуулах</button><button class="btn btn-sm btn-danger" data-act="org-clear" data-dept="${deptId}">Бүтцийг цэвэрлэх</button></div>` : ''}</div>
-    ${has ? `<div class="org-scroll">${orgChart(deptId, edit)}</div>
+    ${has ? `<div class="org-canvas">${orgChart(deptId, edit)}</div>
       ${edit ? '<div class="panel-body" style="padding-top:0"><p class="org-hint">Хүнийг чирж өөр хайрцаг руу зөөнө (хоёр хүн байр солино) · хайрцгийн цэнхэр толгойноос чирж бүхэл хэсгийг өөр хүний доор зөөнө · <b>+</b> дарж доор нь хайрцаг нэмнэ, хүнийг <b>+</b> руу чирвэл шинэ хайрцаг үүсч байрлана · <b>⋯</b> дарж нэр солих, хүн сонгох, устгана.</p></div>' : ''}`
       : `<div class="panel-body" style="display:flex;flex-direction:column;gap:12px;align-items:flex-start">
           <p class="note">Энэ албанд бүтэц үүсгээгүй байна.</p>
