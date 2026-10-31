@@ -31,6 +31,8 @@ create table if not exists public.employees (
 alter table public.employees add column if not exists manager_id bigint references public.employees(id) on delete set null;
 alter table public.employees add column if not exists hired_on   date;
 alter table public.employees add column if not exists notes      text;
+alter table public.employees add column if not exists roster     text;
+alter table public.employees add column if not exists poi        text;
 create index if not exists employees_dept_idx    on public.employees(department_id);
 create index if not exists employees_manager_idx on public.employees(manager_id);
 

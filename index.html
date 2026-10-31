@@ -620,7 +620,7 @@ async function fetchAll(table){
   return out;
 }
 async function loadAll(){
-  if(DEMO){ seedDemo(); S.imports = []; S.nodes = []; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
+  if(DEMO){ S.extra = true; seedDemo(); S.imports = []; S.nodes = []; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
   const [d,e,t,tr] = await Promise.all(['departments','employees','training_types','trainings'].map(fetchAll));
   const l = await sb.from('reminder_log').select('*').order('sent_at',{ascending:false}).limit(2000);
   const s = await sb.from('settings').select('*').eq('id',1).maybeSingle();
@@ -632,6 +632,7 @@ async function loadAll(){
   S.admin = r.error ? /is_admin|function|schema cache/i.test(r.error.message||'') : !!r.data;
   S.admins = [];
   if(S.admin){ const a = await sb.from('app_admins').select('*').order('added_at'); if(!a.error) S.admins = a.data; }
+  { const t = await sb.from('employees').select('roster,poi').limit(1); S.extra = !t.error; }
   try{ S.nodes = await fetchAll('org_nodes'); } catch(e){ console.warn('org_nodes:', e.message); S.nodes = []; }
   const il = await sb.from('import_log').select('id,at,file,by_email,summary,data,undone_at').order('at', { ascending:false }).limit(15);
   S.imports = il.error ? [] : il.data;
@@ -1064,7 +1065,7 @@ function viewEmps(){
   return `<div class="page-head"><div><h1>Ажилтнууд</h1><p>Профайл, зураг, сургалтын түүх</p></div>
     <div class="actions">${importBtn()}${bulkPhotoBtn()}<button class="btn btn-primary" data-act="new-emp">+ Ажилтан нэмэх</button></div></div>
   <div class="toolbar">
-    <input class="inp search" id="ef-q" type="search" placeholder="Нэр, код, албан тушаал, имэйлээр хайх" value="${esc(f.q)}" data-filter="ef" data-key="q" aria-label="Хайх">
+    <input class="inp search" id="ef-q" type="search" placeholder="Нэр, код, албан тушаал, утсаар хайх" value="${esc(f.q)}" data-filter="ef" data-key="q" aria-label="Хайх">
     <select class="inp" id="ef-dept" data-filter="ef" data-key="dept" aria-label="Алба"><option value="">Бүх алба</option>${sortedDepts().map(d => `<option value="${d.id}" ${f.dept==d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select>
     <select class="inp" id="ef-st" data-filter="ef" data-key="status" aria-label="Төлөв"><option value="">Бүх төлөв</option>${['bad','warn','ok','none'].map(s => `<option value="${s}" ${f.status===s?'selected':''}>${ST[s]}</option>`).join('')}</select>
     <label class="check"><input type="checkbox" id="ef-in" data-filter="ef" data-key="inactive" ${f.inactive?'checked':''}>Ажлаас гарсныг харуулах</label>
@@ -1074,7 +1075,7 @@ function viewEmps(){
 function listEmps(){
   const f = S.ef, q = f.q.trim().toLowerCase();
   const l = S.emps.filter(e => (f.inactive || e.active) && (!f.dept || String(e.department_id) === String(f.dept)) && (!f.status || empStatus(e.id) === f.status)
-    && (!q || [e.full_name, e.emp_code, e.position, e.email].join(' ').toLowerCase().includes(q)))
+    && (!q || [e.full_name, e.emp_code, e.position, e.email, e.phone].join(' ').toLowerCase().includes(q)))
     .sort((a,b) => a.full_name.localeCompare(b.full_name, 'mn'));
   if(!l.length) return `<div class="panel empty">Хайлтад тохирох ажилтан олдсонгүй.</div>`;
   return `<p class="count">${l.length} ажилтан</p><div class="cards">${l.map(e => {
@@ -1218,6 +1219,7 @@ function profileBody(id){
     <div style="min-width:0"><h3>${esc(e.full_name)}</h3><p class="muted" style="margin:2px 0 0">${esc(e.position||'—')} · ${esc(deptName(e.department_id))}</p>
       <div style="margin-top:8px">${e.active ? chip(empStatus(id)) : chip('none','Ажлаас гарсан')}</div>
       <dl class="kv"><dt>Код</dt><dd class="mono">${esc(e.emp_code||'—')}</dd><dt>Имэйл</dt><dd>${e.email?`<a href="mailto:${esc(e.email)}">${esc(e.email)}</a>`:'—'}</dd><dt>Утас</dt><dd class="mono">${e.phone?`<a href="tel:${esc(e.phone)}">${esc(e.phone)}</a>`:'—'}</dd>
+        ${e.roster ? `<dt>Ээлж</dt><dd>${esc(e.roster)}</dd>` : ''}${e.poi ? `<dt>Ажилд авсан газар (POI)</dt><dd>${esc(e.poi)}</dd>` : ''}
         <dt>Ажилд орсон</dt><dd>${e.hired_on ? `<span class="mono">${fmtDate(e.hired_on)}</span> <span class="muted">· ${tenure(e.hired_on)}</span>` : '—'}</dd>
         <dt>Шууд удирдлага</dt><dd>${mgr ? `<button class="pchip" data-act="profile" data-id="${mgr.id}">${avatar(mgr,'sm')}${esc(mgr.full_name)}</button> <span class="muted">${esc(mgr.position||'')}</span>` : '—'}</dd></dl>
       ${e.notes ? `<p class="note" style="margin-top:10px;white-space:pre-line">${esc(e.notes)}</p>` : ''}
@@ -1255,6 +1257,8 @@ function empForm(e, deptId){
       <div class="field"><label for="f-ph">Утас</label><input class="inp mono" id="f-ph" name="phone" value="${esc(e.phone||'')}"></div></div>
     <div class="grid2"><div class="field"><label for="f-mgr">Шууд удирдлага</label><select class="inp" id="f-mgr" name="manager_id">${mgrOptions(e)}</select></div>
       <div class="field"><label for="f-hire">Ажилд орсон огноо</label><input class="inp mono" id="f-hire" type="date" name="hired_on" value="${esc(e.hired_on||'')}"></div></div>
+    ${S.extra ? `<div class="grid2"><div class="field"><label for="f-roster">Ээлж (Roster)</label><input class="inp" id="f-roster" name="roster" value="${esc(e.roster||'')}" placeholder="A, B, C, 7/7…"></div>
+      <div class="field"><label for="f-poi">Ажилд авсан газар (POI)</label><input class="inp" id="f-poi" name="poi" value="${esc(e.poi||'')}" placeholder="UB, DZ…"></div></div>` : ''}
     <div class="field"><label for="f-notes">Тэмдэглэл</label><textarea class="inp" id="f-notes" name="notes" placeholder="Мэргэшил, үнэмлэх, онцгой анхаарах зүйл…">${esc(e.notes||'')}</textarea></div>
     <label class="check"><input type="checkbox" name="active" id="f-act" ${e.active?'checked':''}>Идэвхтэй ажиллаж байгаа</label>
     <div class="m-foot"><button class="btn" type="button" data-act="${e.id?'back-profile':'close'}" data-id="${e.id||''}">Болих</button><button class="btn btn-primary" type="submit">Хадгалах</button></div></form>`;
@@ -1338,13 +1342,15 @@ function cellDate(v){
 }
 const HDR = {
   skip: /^(№|#|д\/?д|дд|no\.?|s\/?n|sn|д\.д\.?)$/i,
-  code: /^((ажилтны|таб(ель)?(ийн)?|бүртгэлийн)\s*)?(код|дугаар|№)$|^(emp(loyee)?\s*)?(id|code|no\.?)$|^таб(ель)?$/i,
+  code: /^((ажилтны|таб(ель)?(ийн)?|бүртгэлийн)\s*)?(код|дугаар|№)$|^(emp(loyee)?\s*)?(id|code|no\.?)$|^таб(ель)?$|^sap(\s*(id|no|code|дугаар))?$/i,
   name: /овог.*нэр|^нэр$|^нэрс$|ажилтны\s*нэр|^(full\s*)?name$|employee\s*name|^worker$|^ажилтан$/i,
   last: /^(овог|last\s*name|surname|family\s*name)$/i,
   dept: /^(алба(\s*нэгж)?|хэлтэс|нэгж|баг|dep(t|artment)|team|division|section)$/i,
   pos:  /албан\s*тушаал|^position$|job\s*title|^title$|^мэргэжил$|designation/i,
   email:/имэйл|и-?мэйл|e-?mail|цахим\s*шуудан/i,
   phone:/утас|phone|mobile/i,
+  roster:/^(roster|ээлж(ийн хуваарь)?|shift|хуваарь)$/i,
+  poi:/^(poi|point\s*of\s*hire|hire\s*point|ажилд\s*авсан\s*газар|харьяа\s*газар)$/i,
   hired:/ажилд\s*орсон|hire\s*date|start\s*date|date\s*joined/i,
   mgr:  /^(шууд\s*)?удирдлага(ын\s*нэр)?$|^(line\s*)?manager$|^supervisor$|reports?\s*to/i,
   ttype:/^(сургалт(ын\s*(нэр|төрөл))?|training(\s*(name|type))?|course)$/i,
@@ -1354,7 +1360,7 @@ const HDR = {
   prov: /байгууллага|provider|trainer|сургагч|зохион/i,
   note: /тайлбар|тэмдэглэл|note|remark|comment/i
 };
-const EMP_KEYS = ['code','name','last','dept','pos','email','phone','hired','mgr'];
+const EMP_KEYS = ['code','name','last','dept','pos','email','phone','hired','mgr','roster','poi'];
 const stripKind = h => cellStr(h).replace(/[\s\-–—(]*(дуусах|хүчинтэй|хамрагдсан|expiry|expiration|completed|valid\s*until)(\s*(огноо|хугацаа|date))?[)\s]*$/i, '').trim();
 
 const isSection = t => S.depts.some(d => normKey(d.name) === normKey(t) || normKey(t).startsWith(normKey(d.name)) && normKey(d.name).length >= 2) || /алба|хэлтэс|нэгж|\bбаг\b|team|department|division/i.test(t) || /^[A-Z][A-Z&\/ ]{1,14}$/.test(t);
@@ -1415,7 +1421,7 @@ function parseMatrix(rows){
     if(/^\d+([.,]\d+)?$/.test(name)) return; // томьёоны хог мөр (жишээ нь бүх нүдэнд "229")
     name = cleanName(name);
     const hired = cellDate(get('hired'));
-    const ei = emps.push({ line:lineNo(i), code, name, dept:cellStr(get('dept')) || section, pos:cellStr(get('pos')), email:cellStr(get('email')), phone:cellStr(get('phone')), hired, mgr:cellStr(get('mgr')) }) - 1;
+    const ei = emps.push({ line:lineNo(i), code, name, dept:cellStr(get('dept')) || section, pos:cellStr(get('pos')), email:cellStr(get('email')), phone:cellStr(get('phone')), hired, mgr:cellStr(get('mgr')), roster:cellStr(get('roster')), poi:cellStr(get('poi')) }) - 1;
     if(isLong){
       const t = cellStr(r[longCols.ttype]); if(!t) return;
       const done = longCols.done != null ? cellDate(r[longCols.done]) : null, exp = longCols.exp != null ? cellDate(r[longCols.exp]) : null;
@@ -1429,7 +1435,7 @@ function parseMatrix(rows){
   });
   const dateVals = recs.filter(x => x.date).map(x => x.date), today = todayStr();
   const guess = dateVals.length && dateVals.filter(d => d > today).length / dateVals.length > .5 ? 'exp' : 'done';
-  const found = Object.keys(col).map(k => ({ code:'Код', name:'Овог нэр', last:'Овог', dept:'Алба', pos:'Албан тушаал', email:'Имэйл', phone:'Утас', hired:'Ажилд орсон', mgr:'Удирдлага' })[k]);
+  const found = Object.keys(col).map(k => ({ code:'Код', name:'Овог нэр', last:'Овог', dept:'Алба', pos:'Албан тушаал', email:'Имэйл', phone:'Утас', hired:'Ажилд орсон', mgr:'Удирдлага', roster:'Ээлж', poi:'POI' })[k]);
   return { headerLine:hi+1, subMode, isLong, found, groups:[...groups.values()].map(g => g.name), skipped, emps, recs, errors, hasAmbig:dateVals.length > 0, guess, sections: !col.dept && emps.some(e => e.dept) };
 }
 
@@ -1459,6 +1465,7 @@ function buildQual(sheets){
   }
   return null;
 }
+const codeK = c => normKey(c).replace(/^0+(?=\d)/, '');
 const nameKeys = n => { const k = [normKey(n)]; const w = cellStr(n).split(' '); if(w.length === 2 && !/\./.test(n)) k.push(normKey(w[0][0] + w[1]), normKey(w[1][0] + w[0])); return k; };
 function matchDept(name, map){
   if(!name) return null; const k = normKey(name); if(map.has(k)) return map.get(k);
@@ -1469,14 +1476,14 @@ function matchDept(name, map){
 
 function planImport(P, opt){
   const deptMap = new Map(S.depts.map(d => [normKey(d.name), d]));
-  const byCode = new Map(S.emps.filter(e => e.emp_code).map(e => [normKey(e.emp_code), e]));
+  const byCode = new Map(S.emps.filter(e => e.emp_code).map(e => [codeK(e.emp_code), e]));
   const byName = new Map(); S.emps.forEach(e => nameKeys(e.full_name).forEach(k => { if(!byName.has(k)) byName.set(k, []); byName.get(k).push(e); }));
   const typeMap = new Map(S.types.map(t => [normKey(t.name), t]));
   const out = { empNew:[], empUpd:[], empSame:0, recNew:[], recSame:0, recOld:0, newTypes:[], newDepts:[], errors:[...P.errors], resolved:[], typeFix:[], deact:[], fromQual:0 };
   const Q = opt.qual, qMonths = tk => Q?.months.get(tk);
   const newKeys = new Map();
   P.emps.forEach((r, i) => {
-    let e = r.code && byCode.get(normKey(r.code));
+    let e = r.code && byCode.get(codeK(r.code));
     if(!e){ let c = []; for(const k of nameKeys(r.name)){ c = byName.get(k) || []; if(c.length) break; }
       if(c.length > 1){ const d = matchDept(r.dept, deptMap); const cc = d ? c.filter(x => x.department_id === d.id) : []; if(cc.length === 1) c = cc; }
       if(c.length > 1){ out.errors.push(`${r.line}-р мөр: "${r.name}" нэртэй ${c.length} ажилтан байна — "Код" багана нэмбэл ялгана`); out.resolved[i] = 'skip'; return; }
@@ -1490,6 +1497,8 @@ function planImport(P, opt){
       if(r.pos && r.pos !== (e.position||'')) patch.position = r.pos;
       if(r.email && r.email.toLowerCase() !== (e.email||'').toLowerCase()) patch.email = r.email;
       if(r.phone && String(r.phone) !== String(e.phone||'')) patch.phone = String(r.phone);
+      if(S.extra && r.roster && r.roster !== (e.roster||'')) patch.roster = r.roster;
+      if(S.extra && r.poi && r.poi !== (e.poi||'')) patch.poi = r.poi;
       if(r.hired && r.hired !== e.hired_on) patch.hired_on = r.hired;
       if(r.code && !e.emp_code) patch.emp_code = r.code;
       if(r.name && r.code && r.name !== e.full_name) patch.full_name = r.name;
@@ -1498,7 +1507,7 @@ function planImport(P, opt){
     } else if(!r.name){ out.errors.push(`${r.line}-р мөр: "${r.code}" кодтой ажилтан системд алга, нэр нь хоосон`); out.resolved[i] = 'skip'; }
     else if(!opt.addNew){ out.errors.push(`${r.line}-р мөр: "${r.name}" системд алга (алгаслаа)`); out.resolved[i] = 'skip'; }
     else {
-      const k = r.code ? 'c:' + normKey(r.code) : 'n:' + normKey(r.name);
+      const k = r.code ? 'c:' + codeK(r.code) : 'n:' + normKey(r.name);
       if(newKeys.has(k)){ out.resolved[i] = newKeys.get(k); return; }
       if(r.dept && !matchDept(r.dept, deptMap) && !out.newDepts.includes(r.dept)) out.newDepts.push(r.dept);
       const ne = { _new:true, row:r }; out.empNew.push(ne); newKeys.set(k, ne); out.resolved[i] = ne;
@@ -1604,7 +1613,7 @@ async function applyImport(){
   for(const f of pl.typeFix){ undo.typeFix = undo.typeFix || []; undo.typeFix.push({ id:f.id, old:f.from }); await dbUpdate('training_types', f.id, { validity_months:f.to }); }
   // 3. шинэ ажилтан
   if(pl.empNew.length){
-    const made = await dbInsert('employees', pl.empNew.map(({ row:r }) => ({ emp_code:r.code || null, full_name:r.name, department_id:deptId(r.dept), position:r.pos || null, email:r.email || null, phone:r.phone ? String(r.phone) : null, hired_on:r.hired || null, active:true })));
+    const made = await dbInsert('employees', pl.empNew.map(({ row:r }) => ({ emp_code:r.code || null, full_name:r.name, department_id:deptId(r.dept), position:r.pos || null, email:r.email || null, phone:r.phone ? String(r.phone) : null, hired_on:r.hired || null, active:true, ...(S.extra ? { roster:r.roster || null, poi:r.poi || null } : {}) })));
     made.forEach((e, i) => { pl.empNew[i].id = e.id; undo.emps.push(e.id); });
   }
   // 4. мэдээлэл шинэчлэх
@@ -1615,10 +1624,10 @@ async function applyImport(){
   // 5. удирдлагын холбоос
   let links = 0;
   if(pl.mgrLinks.length){
-    const byCode = new Map(S.emps.filter(e => e.emp_code).map(e => [normKey(e.emp_code), e]));
+    const byCode = new Map(S.emps.filter(e => e.emp_code).map(e => [codeK(e.emp_code), e]));
     const byName = new Map(); S.emps.forEach(e => nameKeys(e.full_name).forEach(k => { if(!byName.has(k)) byName.set(k, []); byName.get(k).push(e); }));
     for(const l of pl.mgrLinks){
-      const id = l.who._new ? l.who.id : l.who.id; let m = byCode.get(normKey(l.mgr));
+      const id = l.who._new ? l.who.id : l.who.id; let m = byCode.get(codeK(l.mgr));
       if(!m){ for(const k of nameKeys(l.mgr)){ const c = byName.get(k) || []; if(c.length === 1){ m = c[0]; break; } } }
       const me = IDX.emp.get(id);
       if(m && me && m.id !== id && me.manager_id !== m.id && !isUnder(m.id, id)){ if(!undo.emps.includes(id)) remember(id, { manager_id:m.id }); await dbUpdate('employees', id, { manager_id:m.id }); links++; }
@@ -1799,7 +1808,7 @@ const FORMS = {
   emp: async f => {
     const id = num(f.id.value);
     const row = { emp_code:f.emp_code.value.trim()||null, full_name:f.full_name.value.trim(), department_id:num(f.department_id.value), position:f.position.value.trim()||null, email:f.email.value.trim()||null, phone:f.phone.value.trim()||null, active:f.active.checked,
-      manager_id:num(f.manager_id.value), hired_on:f.hired_on.value||null, notes:f.notes.value.trim()||null };
+      manager_id:num(f.manager_id.value), hired_on:f.hired_on.value||null, notes:f.notes.value.trim()||null, ...(S.extra && f.roster ? { roster:f.roster.value.trim()||null, poi:f.poi.value.trim()||null } : {}) };
     if(id && row.manager_id && (row.manager_id === id || isUnder(row.manager_id, id))) return toast('Өөрийн доод ажилтныг удирдлага болгож болохгүй','bad');
     const r = await run(() => id ? dbUpdate('employees', id, row) : dbInsert('employees', row), id ? 'Хадгалагдлаа' : 'Ажилтан нэмэгдлээ');
     if(r){ render(); openProfile(r.id); }
