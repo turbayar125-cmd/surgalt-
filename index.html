@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Сургалтын Бүртгэл</title>
+<title>Сургалтын бүртгэл · Premium</title>
+<link rel="icon" type="image/png" href="logo-mark.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -64,6 +65,17 @@ button,input,select,textarea{font:inherit;color:inherit}
 .brand-mark{width:34px;height:34px;border-radius:8px;background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;flex:none}
 .side .brand-mark{background:#3d7be0;color:#fff}
 .brand b{display:block;font-size:14px;line-height:1.2}
+/* Байгууллагын лого */
+.side .brand{flex-direction:column;align-items:flex-start;gap:12px;padding:4px 8px 18px;border-bottom:1px solid var(--s-line)}
+.brand-logo{height:30px;width:auto;display:block;align-self:flex-start;object-fit:contain}
+.brand-app{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--s-muted)}
+.brand-app::before{content:"";width:3px;height:14px;border-radius:2px;background:#f5000a}
+.brand-mark-img{display:none;height:28px;width:auto}
+.nav button[aria-current="page"]{box-shadow:inset 3px 0 0 #f5000a}
+.login-logo{height:30px;width:auto;align-self:flex-start;object-fit:contain}
+.logo-d{display:none}
+:root[data-theme="dark"] .logo-l{display:none} :root[data-theme="dark"] .logo-d{display:block}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .logo-l{display:none} :root:not([data-theme="light"]) .logo-d{display:block}}
 .brand small{color:var(--muted);font-size:12px}
 .side .brand small{color:var(--s-muted)}
 .nav{display:flex;flex-direction:column;gap:2px}
@@ -90,7 +102,10 @@ button,input,select,textarea{font:inherit;color:inherit}
 @media (max-width:860px){
   .shell{grid-template-columns:1fr}
   .side{position:sticky;top:env(safe-area-inset-top,0px);height:auto;z-index:20;flex-direction:row;align-items:center;padding:8px max(12px,env(safe-area-inset-left,0px));gap:12px;border-right:0;border-bottom:1px solid var(--s-line);overflow-x:auto}
-  .brand div{display:none}
+  .brand div,.brand-logo,.brand-app{display:none}
+  .side .brand{padding:0;border:0}
+  .brand-mark-img{display:block}
+  .nav button[aria-current="page"]{box-shadow:inset 0 -2px 0 #f5000a}
   .nav{flex-direction:row}
   .nav button span.lbl{font-size:13px}
   .side-foot{display:flex;margin:0 0 0 auto;flex-direction:row;align-items:center;padding:0 0 0 8px;position:sticky;right:0;background:var(--s-bg);box-shadow:-10px 0 10px var(--s-bg)}
@@ -761,7 +776,7 @@ function render(){
   const nav = [['dash','Хянах самбар'],['org','Алба'],['emps','Ажилтнууд'],['trs','Сургалтын бүртгэл'], ...(S.admin ? [['settings','Тохиргоо']] : [])];
   app.innerHTML = `<div class="shell">
     <aside class="side">
-      <div class="brand"><span class="brand-mark">${I.mark}</span><div><b>Сургалтын бүртгэл</b><small>${esc(S.settings.company_name||'')}</small></div></div>
+      <div class="brand"><img class="brand-logo" src="logo-dark.png" alt="Premium"><img class="brand-mark-img" src="logo-mark.png" alt="Premium"><span class="brand-app">Сургалтын бүртгэл</span></div>
       <nav class="nav" aria-label="Цэс">${nav.map(([k,l]) => `<button data-act="nav" data-v="${k}" ${S.view===k?'aria-current="page"':''}>${I[k]}<span class="lbl">${l}</span>${k==='trs'&&bad?`<span class="badge">${bad}</span>`:''}</button>`).join('')}</nav>
       <div class="side-foot">${DEMO ? '<span>Демо горим</span>' : `<span class="role ${S.admin?'adm':'view'}">${S.admin?'Админ':'Зөвхөн харах'}</span><span class="who-email">${esc(S.user?.email||'')}</span><button class="logout" data-act="logout" title="Системээс гарах" aria-label="Системээс гарах">${I.out}<span class="lbl">Системээс гарах</span></button>`}</div>
     </aside>
@@ -774,7 +789,7 @@ const demoBar = () => `<div class="demo-bar"><b>Демо горим.</b><span>Ж
 
 function viewLogin(){
   return `<div class="login"><div class="panel"><div class="panel-body" style="display:flex;flex-direction:column;gap:16px">
-    <div class="brand" style="padding:0"><span class="brand-mark">${I.mark}</span><div><b>Сургалтын бүртгэл</b><small>Хүний нөөцийн нэвтрэх хэсэг</small></div></div>
+    <div style="display:flex;flex-direction:column;gap:14px;padding-bottom:4px"><img class="login-logo logo-l" src="logo-light.png" alt="Premium"><img class="login-logo logo-d" src="logo-dark.png" alt="Premium"><div><b style="display:block;font-size:16px">Сургалтын бүртгэл</b><small class="muted">Нэвтрэх хэсэг</small></div></div>
     <form data-form="login" style="display:flex;flex-direction:column;gap:12px">
       <div class="field"><label for="lg-email">Имэйл</label><input class="inp" id="lg-email" name="email" type="email" required autocomplete="username"></div>
       <div class="field"><label for="lg-pass">Нууц үг</label><input class="inp" id="lg-pass" name="password" type="password" required autocomplete="current-password"></div>
