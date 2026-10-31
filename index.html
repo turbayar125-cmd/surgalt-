@@ -899,6 +899,8 @@ const ORG_TPL = {
   wh:   [0,1].map(() => CH('Superintendent','Stock Keeper','','')),
   cp:   [0,1].map(() => ['Superintendent', [CH('Shift Master','',''), CH('Shift Master','','')]]),
   hr:   [['HR Manager', [['HR Officer', []], ['HR Officer', []]]]],
+  administration: [['Site Manager', [['Coordinator', []], ['Coordinator', []], ['Planner', []], ['Planner', []]]]],
+  hse:  [0,1].map(() => ['Superintendent', [['HSE Advisor', []], ['HSE Advisor', []]]]),
   mt:   [['Manager', [['Senior Engineer', [['Deputy Engineer', [CH('Mechanic Engineer','',''), CH('Mechanic Engineer','','')]]]], ['Senior Engineer', [['Planning Engineer', [CH('Mechanic Engineer','',''), CH('Mechanic Engineer','','')]]]]]]]
 };
 const tplFor = d => ORG_TPL[normKey(d.name)] || null;
@@ -918,7 +920,7 @@ function orgBranch(n, K, edit){
   const ch = K.get(n.id) || [], leaves = ch.filter(c => !(K.get(c.id) || []).length);
   let sub = '';
   if(!ch.length) sub = edit ? addBtn(n.id) : '';
-  else if(leaves.length === ch.length && ch.length > 2) sub = `<div class="leaf-group">${ch.map(c => obox(c, edit)).join('')}${edit ? addBtn(n.id) : ''}</div>`;
+  else if(leaves.length === ch.length && ch.length > 4) sub = `<div class="leaf-group">${ch.map(c => obox(c, edit)).join('')}${edit ? addBtn(n.id) : ''}</div>`;
   else sub = `<ul>${ch.map(c => orgBranch(c, K, edit)).join('')}</ul>`;
   return `<li>${obox(n, edit, !n.parent_id)}${sub}</li>`;
 }
