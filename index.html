@@ -506,6 +506,7 @@ function errMsg(e){ const m = e?.message || String(e); if(e?.code==='23505') ret
 async function run(fn, okMsg){ try{ const r = await fn(); if(okMsg) toast(typeof okMsg==='function'?okMsg(r):okMsg); return r; } catch(e){ console.error(e); toast(errMsg(e),'bad'); } }
 
 /* ---------- status ---------- */
+const hideLimit = () => { const v = S.settings.hide_expired_days; return v == null || v === '' ? 500 : Number(v); };
 const warnDays = () => { const d = S.settings.reminder_days || []; return d.length ? Math.max(...d) : 30; };
 const statusOf = d => d < 0 ? 'bad' : d <= warnDays() ? 'warn' : 'ok';
 const ST = { ok:'Хүчинтэй', warn:'Дуусах дөхсөн', bad:'Хугацаа дууссан', none:'Сургалтгүй' };
@@ -522,9 +523,11 @@ function reindex(){
     if(!p || t.expires_on > p.expires_on || (t.expires_on === p.expires_on && t.id > p.id)) cur.set(k, t);
   }
   IDX.currentIds = new Set();
-  IDX.current = [...cur.values()].filter(t => IDX.emp.has(t.employee_id) && IDX.type.has(t.training_type_id)).map(t => {
-    IDX.currentIds.add(t.id); const days = daysUntil(t.expires_on); return { ...t, days, status: statusOf(days) };
-  });
+  // Хэт удаан хэтэрсэн (жишээ нь 500+ хоног) бичлэгийг идэвхгүй гэж үзэж тооцоололд оруулахгүй; профайлын "Өмнөх бичлэг"-д үлдэнэ
+  const lim = hideLimit(); IDX.hidden = 0;
+  IDX.current = [...cur.values()].filter(t => IDX.emp.has(t.employee_id) && IDX.type.has(t.training_type_id)).map(t => ({ ...t, days:daysUntil(t.expires_on) }))
+    .filter(t => { if(lim > 0 && t.days < -lim){ IDX.hidden++; return false; } return true; })
+    .map(t => { IDX.currentIds.add(t.id); return { ...t, status: statusOf(t.days) }; });
   IDX.byEmp = new Map();
   for(const c of IDX.current){ if(!IDX.byEmp.has(c.employee_id)) IDX.byEmp.set(c.employee_id, []); IDX.byEmp.get(c.employee_id).push(c); }
 }
@@ -1469,6 +1472,8 @@ function viewSettings(){
   <div class="cols">
     <section class="panel"><div class="panel-head"><h2>Имэйл сануулга</h2></div><div class="panel-body">
       <form data-form="settings" style="display:flex;flex-direction:column;gap:12px">
+        <div class="field"><label for="st-hide">Хэтэрсэн хугацааг тооцохгүй (хоногоос дээш)</label><input class="inp mono" id="st-hide" name="hide_days" type="number" min="0" value="${hideLimit()}">
+          <p class="note">Хугацаа нь үүнээс олон хоног хэтэрсэн сургалтыг дууссан гэж тоолохгүй, жагсаалт, самбар, захиалгаас хасна (одоогоор <b>${IDX.hidden || 0}</b> бичлэг). Профайлын "Өмнөх бичлэгүүд"-д үлдэнэ. 0 = бүгдийг харуулах.</p></div>
         <div class="field"><label for="st-days">Хэдэн хоногийн өмнө илгээх</label><input class="inp mono" id="st-days" name="days" value="${esc((s.reminder_days||[]).join(', '))}" placeholder="30, 14, 7, 1, 0">
           <p class="note">Таслалаар тусгаарлана. 0 гэвэл дуусах өдөр нь илгээнэ. Хамгийн их тоо нь "дуусах дөхсөн" төлвийн босго болно.</p></div>
         <div class="grid2">
@@ -2205,7 +2210,7 @@ const FORMS = {
   settings: async f => {
     const days = [...new Set(f.days.value.split(/[,\s]+/).map(Number).filter(n => Number.isInteger(n) && n >= 0))].sort((a,b) => b-a);
     if(!days.length) return toast('Дор хаяж нэг хоног оруулна уу','bad');
-    const r = await run(() => saveSettings({ reminder_days:days, hr_email:f.hr_email.value.trim()||null, from_email:f.from_email.value.trim(), company_name:f.company_name.value.trim() }), 'Тохиргоо хадгалагдлаа');
+    const r = await run(() => saveSettings({ reminder_days:days, hr_email:f.hr_email.value.trim()||null, from_email:f.from_email.value.trim(), company_name:f.company_name.value.trim(), ...('hide_expired_days' in S.settings || DEMO ? { hide_expired_days:Math.max(0, Number(f.hide_days.value)||0) } : {}) }), 'Тохиргоо хадгалагдлаа');
     render();
   },
   'add-dept': async f => { const n = f.name.value.trim(); await run(async () => { await dbInsert('departments', { name:n, sort:S.depts.length+1 }); render(); }, 'Алба нэмэгдлээ'); },

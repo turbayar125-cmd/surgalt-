@@ -77,6 +77,7 @@ create table if not exists public.settings (
 );
 alter table public.settings add column if not exists last_import jsonb;
 alter table public.settings add column if not exists last_book jsonb;
+alter table public.settings add column if not exists hide_expired_days int not null default 500;
 insert into public.settings (id) values (1) on conflict (id) do nothing;
 
 -- Excel импорт бүрийн бүртгэл (буцаахад хэрэглэнэ)
