@@ -175,6 +175,25 @@ textarea.inp{resize:vertical;min-height:70px}
 .chip-plain{background:var(--surface-2);color:var(--muted)}
 .chip-acc{background:var(--accent-soft);color:var(--accent)}
 .bk-list{display:flex;flex-direction:column;gap:10px}
+.bk-days{display:flex;flex-direction:column;gap:14px}
+.bk-day.past{opacity:.82} .bk-day.today{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.bk-dh{display:flex;gap:12px;align-items:center}
+.bk-dh .bk-date{width:52px;padding:5px 0;grid-row:auto}
+.bk-sess{display:flex;flex-direction:column;gap:12px}
+.bk-s{border:1px solid var(--line-2);border-radius:10px;padding:12px 14px;background:var(--surface)}
+.bk-sh{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-bottom:10px}
+.bk-ppl{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px}
+.bk-p{display:flex;gap:8px;align-items:center;border:1px solid var(--line-2);border-radius:9px;padding:5px 8px;background:var(--surface);position:relative;min-width:0;cursor:pointer}
+.bk-p:hover{border-color:var(--accent)}
+.bk-p.cancelled,.bk-p.noshow{opacity:.55} .bk-p.cancelled .bk-pn b{text-decoration:line-through}
+.bk-pn{min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.bk-pn b{font-weight:500;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bk-pn small{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bk-st{width:8px;height:8px;border-radius:50%;flex:none;margin-left:auto} .bk-st.st-ok{background:var(--ok)} .bk-st.st-bad{background:var(--bad)} .bk-st.st-none{background:var(--none)}
+.bk-x{margin-left:auto;border:0;background:none;color:var(--faint);cursor:pointer;border-radius:5px;padding:0 4px;font-size:14px}
+.bk-x:hover{background:var(--surface-2);color:var(--fg)} .bk-st + .bk-x{margin-left:2px}
+.bk-mx th,.bk-mx td{padding:7px 6px;font-size:12.5px} .bk-mx th:first-child,.bk-mx td:first-child{position:sticky;left:0;background:var(--surface);z-index:1;padding-left:12px}
+.hm{display:inline-grid;place-items:center;min-width:24px;height:22px;border-radius:6px;background:rgb(47 95 179 / var(--a));color:var(--fg);font-weight:600;font-variant-numeric:tabular-nums}
 .bk{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:6px 16px;align-items:start}
 .bk-date{width:58px;border-radius:10px;background:var(--accent-soft);color:var(--accent);text-align:center;padding:6px 0;line-height:1.1;grid-row:span 2}
 .bk-date b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
@@ -211,7 +230,7 @@ textarea.inp{resize:vertical;min-height:70px}
 /* Харах эрхтэй хэрэглэгчид засах товчнуудыг нууна */
 body.ro [data-act="new-emp"],body.ro [data-act="edit-emp"],body.ro [data-act="del-emp"],body.ro [data-act="new-tr"],body.ro [data-act="edit-tr"],
 body.ro [data-act="del-tr"],body.ro [data-act="renew"],body.ro [data-act="bulk"],body.ro [data-act="send-now"],body.ro [data-act="del-dept"],
-body.ro [data-act="del-type"],body.ro [data-act="del-admin"],body.ro label:has(> input[data-import]),body.ro label:has(> input[data-bulkphoto]),body.ro label:has(> input[data-photo]),
+body.ro [data-act="del-type"],body.ro [data-act="del-admin"],body.ro label:has(> input[data-import]),body.ro label:has(> input[data-bulkphoto]),body.ro label:has(> input[data-bookimport]),body.ro label:has(> input[data-photo]),
 body.ro .tbl td.num:has([data-act="renew"]),body.ro .tr-act,body.ro .drop,body.ro .prof-top .actions{display:none!important}
 .role{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;border-radius:999px;padding:2px 9px;align-self:flex-start}
 .role.adm{background:#2a3a58;color:#cfe0ff} .role.view{background:#22303a;color:#bfe3cf}
@@ -445,7 +464,7 @@ const CONFIG = {
 const DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
 const sb = (!DEMO && window.supabase) ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY) : null;
 
-const TABLES = { training_bookings:'books', departments:'depts', employees:'emps', training_types:'types', trainings:'trs', reminder_log:'logs', org_nodes:'nodes' };
+const TABLES = { booking_items:'bitems', training_bookings:'books', departments:'depts', employees:'emps', training_types:'types', trainings:'trs', reminder_log:'logs', org_nodes:'nodes' };
 const S = {
   ready:false, auth:null, user:null, view:'dash',
   depts:[], emps:[], types:[], trs:[], logs:[],
@@ -637,7 +656,7 @@ async function fetchAll(table){
   return out;
 }
 async function loadAll(){
-  if(DEMO){ S.extra = true; seedDemo(); S.imports = []; S.nodes = []; S.books = []; S.hasBook = true; S.hasLicFlag = true; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
+  if(DEMO){ S.extra = true; seedDemo(); S.imports = []; S.nodes = []; S.books = []; S.bitems = []; S.hasBook = true; S.hasLicFlag = true; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
   const [d,e,t,tr] = await Promise.all(['departments','employees','training_types','trainings'].map(fetchAll));
   const l = await sb.from('reminder_log').select('*').order('sent_at',{ascending:false}).limit(2000);
   const s = await sb.from('settings').select('*').eq('id',1).maybeSingle();
@@ -650,7 +669,8 @@ async function loadAll(){
   S.admins = [];
   if(S.admin){ const a = await sb.from('app_admins').select('*').order('added_at'); if(!a.error) S.admins = a.data; }
   { const t = await sb.from('employees').select('roster,poi').limit(1); S.extra = !t.error; }
-  try{ S.books = await fetchAll('training_bookings'); S.hasBook = true; } catch(e){ console.warn('bookings:', e.message); S.books = []; S.hasBook = false; }
+  try{ S.bitems = await fetchAll('booking_items'); S.hasBook = true; } catch(e){ console.warn('booking_items:', e.message); S.bitems = []; S.hasBook = false; }
+  S.books = [];
   { const t = await sb.from('training_types').select('is_license').limit(1); S.hasLicFlag = !t.error; }
   try{ S.nodes = await fetchAll('org_nodes'); } catch(e){ console.warn('org_nodes:', e.message); S.nodes = []; }
   const il = await sb.from('import_log').select('id,at,file,by_email,summary,data,undone_at').order('at', { ascending:false }).limit(15);
@@ -675,6 +695,7 @@ async function dbDelete(table, id){
   const k = TABLES[table]; S[k] = S[k].filter(x => x.id !== id);
   if(table === 'employees'){ S.trs = S.trs.filter(t => t.employee_id !== id); S.emps.forEach(e => { if(e.manager_id === id) e.manager_id = null; }); S.nodes.forEach(n => { if(n.employee_id === id) n.employee_id = null; }); }
   if(table === 'departments') S.nodes = S.nodes.filter(n => n.department_id !== id);
+  if(table === 'employees') S.bitems.forEach(b => { if(b.employee_id === id) b.employee_id = null; });
   if(table === 'training_types') S.trs = S.trs.filter(t => t.training_type_id !== id);
   if(table === 'departments') S.emps.forEach(e => { if(e.department_id === id) e.department_id = null; });
   if(table === 'trainings') S.logs = S.logs.filter(l => l.training_id !== id);
@@ -1191,52 +1212,127 @@ function listLic(){
   </tbody></table></div>`;
 }
 
-/* --- Сургалт захиалга --- */
-const BK_ST = { planned:['Төлөвлөсөн','plain'], confirmed:['Баталгаажсан','acc'], done:['Явагдсан','ok'], cancelled:['Цуцалсан','none'] };
+/* --- Сургалт захиалга (Excel booking track) --- */
+const BK = { planned:['Төлөвлөсөн','acc'], done:['Явагдсан','ok'], cancelled:['Цуцалсан','none'], noshow:['Ирээгүй','bad'] };
+const WD = ['Ням','Даваа','Мягмар','Лхагва','Пүрэв','Баасан','Бямба'];
 const MON = ['1-р сар','2-р сар','3-р сар','4-р сар','5-р сар','6-р сар','7-р сар','8-р сар','9-р сар','10-р сар','11-р сар','12-р сар'];
-const money = v => v == null || v === '' ? '' : Number(v).toLocaleString('en-US') + '₮';
-const openBooks = () => S.books.filter(b => b.status === 'planned' || b.status === 'confirmed');
+const monLabel = m => { const [y, mm] = String(m).split('-'); return mm ? `${y} оны ${MON[+mm - 1]}` : m; };
+const biDept = b => { const e = b.employee_id && IDX.emp.get(b.employee_id); return (e && deptName(e.department_id) !== '—') ? deptName(e.department_id) : (matchDept(b.dept_name, new Map(S.depts.map(d => [normKey(d.name), d])))?.name || b.dept_name || '—'); };
+const biName = b => { const e = b.employee_id && IDX.emp.get(b.employee_id); return e ? e.full_name : (b.full_name || '—'); };
+const biType = b => b.training_type_id ? typeName(b.training_type_id) : (b.training_name || '—');
 function dueList(){
-  const booked = new Map(); openBooks().forEach(b => (b.employee_ids||[]).forEach(id => booked.set(b.training_type_id + ':' + id, b)));
+  const today = todayStr(), booked = new Set(S.bitems.filter(b => b.status === 'planned' && (!b.start_on || b.start_on >= addDays(today, -7))).map(b => b.training_type_id + ':' + b.employee_id));
   const by = new Map();
   for(const c of activeCurrent()){ if(c.days > 60 || booked.has(c.training_type_id + ':' + c.employee_id)) continue;
     if(!by.has(c.training_type_id)) by.set(c.training_type_id, { bad:0, warn:0, ids:[] }); const g = by.get(c.training_type_id); g.ids.push(c.employee_id); c.days < 0 ? g.bad++ : g.warn++; }
   return [...by].map(([tid, g]) => ({ tid, ...g })).sort((a, b) => b.ids.length - a.ids.length);
 }
+function bkFiltered(){
+  const v = S.bv, q = v.q.trim().toLowerCase();
+  return S.bitems.filter(b => (!v.month || b.month === v.month) && (!v.dept || biDept(b) === v.dept) && (!v.status || b.status === v.status)
+    && (!q || (biName(b) + ' ' + (b.emp_code||'') + ' ' + biType(b) + ' ' + (b.location||'')).toLowerCase().includes(q)));
+}
 function viewBook(){
   if(!S.hasBook) return `<div class="page-head"><div><h1>Сургалт захиалгын мэдээлэл</h1></div></div><div class="panel panel-body"><p class="note">Энэ хэсгийг ашиглахын тулд Supabase дээр шинэчлэгдсэн <b>setup.sql</b>-ийг дахин ажиллуулна уу.</p></div>`;
-  const today = todayStr(), up = openBooks().sort((a,b) => (a.start_on||'9').localeCompare(b.start_on||'9')), past = S.books.filter(b => !up.includes(b)).sort((a,b) => (b.start_on||'').localeCompare(a.start_on||''));
-  const ppl = up.reduce((s, b) => s + (b.employee_ids||[]).length, 0), cost = up.reduce((s, b) => s + (Number(b.cost)||0), 0);
-  const due = dueList(), dueN = due.reduce((s, g) => s + g.ids.length, 0);
+  const months = [...new Set(S.bitems.map(b => b.month).filter(Boolean))].sort().reverse(), cur = todayStr().slice(0, 7);
+  const v = S.bv ||= { month: months.includes(cur) ? cur : (months[0] || ''), view:'day', dept:'', status:'', q:'' };
+  if(v.month && !months.includes(v.month)) v.month = months.includes(cur) ? cur : (months[0] || '');
+  const all = bkFiltered(), ppl = new Set(all.map(b => b.employee_id || b.emp_code || b.full_name)).size;
+  const cnt = k => all.filter(b => b.status === k).length, days = new Set(all.map(b => b.start_on).filter(Boolean)).size;
   const tile = (cls, lbl, val, sub) => `<div class="tile ${cls}" style="cursor:default"><span class="t-lbl">${lbl}</span><span class="t-num">${val}</span><span class="t-sub">${sub}</span></div>`;
-  return `<div class="page-head"><div><h1>Сургалт захиалгын мэдээлэл</h1><p>Төлөвлөсөн сургалт, оролцогч, зардал</p></div>
-    <div class="actions">${S.admin ? '<button class="btn btn-primary" data-act="bk-new">+ Шинэ захиалга</button>' : ''}</div></div>
+  const tab = (k, l) => `<button class="btn btn-sm ${v.view === k ? 'btn-primary' : ''}" data-act="bk-view" data-v="${k}">${l}</button>`;
+  const deptsIn = [...new Set(S.bitems.filter(b => !v.month || b.month === v.month).map(biDept))].sort();
+  let body = '';
+  if(!S.bitems.length) body = `<div class="panel panel-body" style="display:flex;flex-direction:column;gap:10px;align-items:flex-start"><p class="note">Захиалгын бүртгэл алга. <b>Захиалгын Excel</b>-ээ (booking track) оруулна уу. Сарын sheet (November гэх мэт) автоматаар сонгогдоно.</p>${S.admin ? bookImportBtn('Захиалгын Excel оруулах', 'btn btn-primary') : ''}</div>`;
+  else if(v.view === 'dept') body = bkDeptView(all);
+  else if(v.view === 'type') body = bkTypeView(all);
+  else body = bkDayView(all);
+  const due = dueList();
+  return `<div class="page-head"><div><h1>Сургалт захиалгын мэдээлэл</h1><p>${v.month ? monLabel(v.month) : 'Бүх сар'} · ${all.length} захиалга, ${ppl} ажилтан, ${days} өдөр</p></div>
+    <div class="actions">${S.admin ? `${bookImportBtn()}<button class="btn btn-primary" data-act="bk-new">+ Захиалга нэмэх</button>` : ''}</div></div>
+  ${S.settings.last_book ? `<p class="last-imp" style="margin:-8px 0 0">Сүүлд шинэчилсэн: ${fmtDate(String(S.settings.last_book.at).slice(0,10))} · ${esc(S.settings.last_book.file)} · ${esc(S.settings.last_book.sheets)}</p>` : ''}
   <div class="tiles">
-    ${tile('', 'Хүлээгдэж буй захиалга', up.length, `Ойрын: ${up[0]?.start_on ? fmtDate(up[0].start_on) : '—'}`)}
-    ${tile('ok', 'Хамрагдах ажилтан', ppl, 'Нээлттэй захиалгуудад')}
-    ${tile('warn', 'Захиалга хэрэгтэй', dueN, '60 хоногт дуусах / дууссан')}
-    ${tile('', 'Төлөвлөсөн зардал', cost ? money(cost) : '—', 'Нээлттэй захиалгуудын')}
+    ${tile('', 'Нийт захиалга', all.length, `${ppl} ажилтан`)}
+    ${tile('warn', 'Төлөвлөсөн', cnt('planned'), `${days} өдөрт`)}
+    ${tile('ok', 'Явагдсан', cnt('done'), cnt('noshow') ? `${cnt('noshow')} ирээгүй` : 'Хамрагдсан')}
+    ${tile('bad', 'Цуцалсан', cnt('cancelled'), 'Сарын турш')}
   </div>
-  <div class="cols">
-    <section class="panel"><div class="panel-head"><h2>Хүлээгдэж буй захиалга</h2><span class="chip chip-plain">${up.length}</span></div>
-      <div class="panel-body">${up.length ? `<div class="bk-list">${up.map(bkCard).join('')}</div>` : '<div class="empty">Захиалга алга.</div>'}</div></section>
-    <section class="panel"><div class="panel-head"><h2>Захиалга хэрэгтэй сургалт</h2><span class="note">Захиалгад ороогүй хүмүүс</span></div>
-      <div class="panel-body" style="padding-block:4px">${due.length ? due.slice(0, 12).map(g => `<div class="due-row"><span style="min-width:0"><b style="font-weight:500">${esc(typeName(g.tid))}</b><br><span class="p-sub">${g.bad ? `<span style="color:var(--bad)">${g.bad} дууссан</span>` : ''}${g.bad && g.warn ? ' · ' : ''}${g.warn ? `<span style="color:var(--warn)">${g.warn} дуусах дөхсөн</span>` : ''}</span></span>
-        <span class="chip chip-plain">${g.ids.length} хүн</span>${S.admin ? `<button class="btn btn-sm" data-act="bk-new" data-type="${g.tid}">Захиалах</button>` : '<span></span>'}</div>`).join('') : '<div class="empty">Бүх хүн хамрагдсан эсвэл захиалгад орсон байна.</div>'}</div></section>
+  <div class="toolbar">
+    <select class="inp" data-bv="month" aria-label="Сар"><option value="">Бүх сар</option>${months.map(m => `<option value="${m}" ${v.month === m ? 'selected' : ''}>${monLabel(m)}</option>`).join('')}</select>
+    <select class="inp" data-bv="dept" aria-label="Алба"><option value="">Бүх алба</option>${deptsIn.map(d => `<option ${v.dept === d ? 'selected' : ''}>${esc(d)}</option>`).join('')}</select>
+    <select class="inp" data-bv="status" aria-label="Төлөв"><option value="">Бүх төлөв</option>${Object.entries(BK).map(([k, [l]]) => `<option value="${k}" ${v.status === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+    <input class="inp search" type="search" data-bv="q" value="${esc(v.q)}" placeholder="Нэр, САП, сургалт, байршил" aria-label="Хайх">
+    <span style="display:flex;gap:6px">${tab('day','Өдрөөр')}${tab('dept','Албаар')}${tab('type','Сургалтаар')}</span>
   </div>
-  ${past.length ? `<section class="panel"><div class="panel-head"><h2>Өмнөх захиалгууд</h2><span class="chip chip-plain">${past.length}</span></div><div class="panel-body"><div class="bk-list">${past.slice(0, 30).map(bkCard).join('')}</div></div></section>` : ''}`;
+  <div id="bk-body">${body}</div>
+  ${due.length ? `<section class="panel"><div class="panel-head"><h2>Захиалга хэрэгтэй сургалт</h2><span class="note">60 хоногт дуусах / дууссан, захиалгад ороогүй</span></div>
+    <div class="panel-body" style="padding-block:4px">${due.slice(0, 10).map(g => `<div class="due-row"><span style="min-width:0"><b style="font-weight:500">${esc(typeName(g.tid))}</b><br><span class="p-sub">${g.bad ? `<span style="color:var(--bad)">${g.bad} дууссан</span>` : ''}${g.bad && g.warn ? ' · ' : ''}${g.warn ? `<span style="color:var(--warn)">${g.warn} дуусах дөхсөн</span>` : ''}</span></span>
+      <span class="chip chip-plain">${g.ids.length} хүн</span>${S.admin ? `<button class="btn btn-sm" data-act="bk-new" data-type="${g.tid}">Захиалах</button>` : '<span></span>'}</div>`).join('')}</div></section>` : ''}`;
 }
-function bkCard(b){
-  const d = b.start_on ? parseYmd(b.start_on) : null, [stl, stc] = BK_ST[b.status] || BK_ST.planned, ids = b.employee_ids || [];
-  const faces = ids.slice(0, 6).map(id => IDX.emp.get(id)).filter(Boolean);
-  return `<div class="bk ${b.status}"><div class="bk-date">${d ? `<b>${d.getDate()}</b><span>${MON[d.getMonth()]}</span>` : '<b>—</b>'}</div>
-    <div style="min-width:0"><div class="bk-title">${esc(b.title || typeName(b.training_type_id))}</div>
-      <div class="bk-meta">${b.start_on ? `<span>${fmtDate(b.start_on)}${b.end_on && b.end_on !== b.start_on ? ' – ' + fmtDate(b.end_on) : ''}</span>` : ''}${b.location ? `<span>📍 ${esc(b.location)}</span>` : ''}${b.provider ? `<span>${esc(b.provider)}</span>` : ''}<span>${ids.length}${b.capacity ? '/' + b.capacity : ''} хүн</span>${b.cost ? `<span>${money(b.cost)}</span>` : ''}</div>
-      ${b.notes ? `<div class="bk-meta" style="margin-top:2px">${esc(b.notes)}</div>` : ''}</div>
-    ${chip(stc, stl)}
-    <div class="bk-act"><span class="faces">${faces.map(e => avatar(e,'sm')).join('')}</span>
-      ${S.admin && (b.status === 'planned' || b.status === 'confirmed') ? `<button class="btn btn-sm" data-act="bk-edit" data-id="${b.id}">Засах</button>${b.status === 'planned' ? `<button class="btn btn-sm" data-act="bk-st" data-st="confirmed" data-id="${b.id}">Баталгаажуулах</button>` : ''}<button class="btn btn-sm btn-primary" data-act="bk-done" data-id="${b.id}">Явагдсан</button><button class="btn btn-sm btn-danger" data-act="bk-st" data-st="cancelled" data-id="${b.id}">Цуцлах</button>`
-        : `<button class="btn btn-sm" data-act="bk-view" data-id="${b.id}">Оролцогчид</button>${S.admin ? `<button class="btn btn-sm btn-danger" data-act="bk-del" data-id="${b.id}">Устгах</button>` : ''}`}</div></div>`;
+const bookImportBtn = (label = 'Захиалгын Excel', cls = 'btn') => `<label class="${cls}" style="cursor:pointer">${label}<input type="file" accept=".xlsx,.xls,.xlsm" data-bookimport hidden></label>`;
+const timeSpan = b => b.start_time ? `${b.start_time}${b.end_time ? '–' + b.end_time : ''}` : '';
+function bkGroups(list){ // нэг сургалт, нэг цаг, нэг газар = нэг хичээл
+  const m = new Map();
+  for(const b of list){ const k = [b.start_on, biType(b), b.start_time, b.location, b.room].join('|'); if(!m.has(k)) m.set(k, []); m.get(k).push(b); }
+  return [...m.values()].sort((a, b) => (a[0].start_time || '99').localeCompare(b[0].start_time || '99') || biType(a[0]).localeCompare(biType(b[0])));
+}
+const deptChips = list => { const c = {}; list.forEach(b => { const d = biDept(b); c[d] = (c[d] || 0) + 1; }); return Object.entries(c).sort((a, b) => b[1] - a[1]).map(([d, n]) => `<span class="chip chip-plain">${esc(d)} ${n}</span>`).join(''); };
+function personChip(b){
+  const e = b.employee_id && IDX.emp.get(b.employee_id), [l, c] = BK[b.status] || BK.planned;
+  return `<span class="bk-p ${b.status}" ${e ? `data-act="profile" data-id="${e.id}"` : ''} title="${esc(biName(b))} · ${esc(b.position || '')} · ${l}${b.kind ? ' · ' + esc(b.kind) : ''}${b.note ? ' · ' + esc(b.note) : ''}">
+    ${e ? avatar(e, 'sm') : `<span class="av av-sm av-ini" style="--h:210">${esc(initials(b.full_name))}</span>`}<span class="bk-pn"><b>${esc(biName(b))}</b><small>${esc(biDept(b))}${b.kind ? ' · ' + esc(b.kind) : ''}</small></span>
+    ${b.status !== 'planned' ? `<i class="bk-st st-${c}" title="${l}"></i>` : ''}${S.admin ? `<button class="bk-x" data-act="bk-item" data-id="${b.id}" title="Төлөв өөрчлөх" aria-label="Төлөв">⋯</button>` : ''}</span>`;
+}
+function sessionCard(g){
+  const b = g[0], open = g.filter(x => x.status === 'planned').length;
+  return `<div class="bk-s"><div class="bk-sh"><div style="min-width:0"><div class="bk-title">${esc(biType(b))}</div>
+      <div class="bk-meta">${timeSpan(b) ? `<span>🕒 ${esc(timeSpan(b))}</span>` : ''}${b.location ? `<span>📍 ${esc(b.location)}${b.room ? ' · анги ' + esc(b.room) : ''}</span>` : ''}<span>${g.length} хүн</span>${b.end_on && b.end_on !== b.start_on ? `<span>${fmtDate(b.start_on)}–${fmtDate(b.end_on)}</span>` : ''}</div></div>
+    ${S.admin && open ? `<span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm btn-primary" data-act="bk-done" data-ids="${g.map(x => x.id).join(',')}">Явагдсан</button><button class="btn btn-sm btn-danger" data-act="bk-cancel" data-ids="${g.map(x => x.id).join(',')}">Цуцлах</button></span>` : ''}</div>
+    <div class="bk-ppl">${g.map(personChip).join('')}</div></div>`;
+}
+function bkDayView(all){
+  const byDay = new Map(); all.forEach(b => { const k = b.start_on || ''; if(!byDay.has(k)) byDay.set(k, []); byDay.get(k).push(b); });
+  const today = todayStr(), keys = [...byDay.keys()].sort((a, b) => (a || '9999').localeCompare(b || '9999'));
+  if(!keys.length) return '<div class="panel empty">Тохирох захиалга алга.</div>';
+  return `<div class="bk-days">${keys.map(k => { const l = byDay.get(k), d = k ? parseYmd(k) : null, past = k && k < today;
+    return `<section class="panel bk-day ${k === today ? 'today' : ''} ${past ? 'past' : ''}"><div class="panel-head"><div class="bk-dh">${d ? `<span class="bk-date"><b>${d.getDate()}</b><span>${MON[d.getMonth()]}</span></span><span><b>${WD[d.getDay()]}</b>${k === today ? ' · <span style="color:var(--accent)">Өнөөдөр</span>' : ''}<br><span class="p-sub">${fmtDate(k)}</span></span>` : '<b>Огноо тодорхойгүй</b>'}</div>
+      <div class="chips-row" style="align-items:center"><span class="chip chip-acc">${l.length} хүн</span>${deptChips(l)}</div></div>
+      <div class="panel-body bk-sess">${bkGroups(l).map(sessionCard).join('')}</div></section>`; }).join('')}</div>`;
+}
+function bkDeptView(all){
+  const days = [...new Set(all.map(b => b.start_on).filter(Boolean))].sort(), depts = [...new Set(all.map(biDept))].sort((a, b) => a.localeCompare(b));
+  if(!all.length) return '<div class="panel empty">Тохирох захиалга алга.</div>';
+  const n = (d, day) => all.filter(b => biDept(b) === d && (day === null ? true : day === '' ? !b.start_on : b.start_on === day)).length;
+  const noDate = all.some(b => !b.start_on);
+  const head = `<tr><th>Алба</th>${days.map(d => { const x = parseYmd(d); return `<th class="num" title="${fmtDate(d)} ${WD[x.getDay()]}">${x.getDate()}<br><span class="faint" style="font-weight:500">${WD[x.getDay()].slice(0,2)}</span></th>`; }).join('')}${noDate ? '<th class="num">?</th>' : ''}<th class="num">Нийт</th></tr>`;
+  const cell = v => v ? `<td class="num"><span class="hm" style="--a:${Math.min(1, .15 + v / 12)}">${v}</span></td>` : '<td class="num faint">·</td>';
+  const rows = depts.map(dp => `<tr><td><button class="btn-link" data-act="bk-dept" data-d="${esc(dp)}" style="color:inherit;font-weight:600">${esc(dp)}</button></td>${days.map(d => cell(n(dp, d))).join('')}${noDate ? cell(n(dp, '')) : ''}<td class="num"><b>${n(dp, null)}</b></td></tr>`).join('');
+  const tot = `<tr><td><b>Нийт</b></td>${days.map(d => `<td class="num"><b>${all.filter(b => b.start_on === d).length}</b></td>`).join('')}${noDate ? `<td class="num"><b>${all.filter(b => !b.start_on).length}</b></td>` : ''}<td class="num"><b>${all.length}</b></td></tr>`;
+  return `<section class="panel"><div class="panel-head"><h2>Алба × өдөр</h2><span class="note">Тоо дээр биш, албаны нэр дээр дарж тухайн албаар шүүнэ</span></div><div class="tbl-wrap"><table class="tbl bk-mx"><thead>${head}</thead><tbody>${rows}${tot}</tbody></table></div></section>
+  ${depts.map(dp => { const l = all.filter(b => biDept(b) === dp).sort((a, b) => (a.start_on || '9').localeCompare(b.start_on || '9') || biName(a).localeCompare(biName(b)));
+    return `<section class="panel"><div class="panel-head"><h2>${esc(dp)}</h2><span class="chip chip-plain">${l.length} захиалга · ${new Set(l.map(b => b.employee_id || b.emp_code)).size} хүн</span></div>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Огноо</th><th>Ажилтан</th><th>Сургалт</th><th>Цаг</th><th>Байршил</th><th>Төлөв</th></tr></thead><tbody>${l.map(b => { const [st, c] = BK[b.status] || BK.planned, e = b.employee_id && IDX.emp.get(b.employee_id);
+        return `<tr><td class="mono">${b.start_on ? fmtDate(b.start_on) : '<span class="faint">—</span>'}</td><td>${e ? `<button class="who btn-link" data-act="profile" data-id="${e.id}" style="color:inherit">${avatar(e,'sm')}<span>${esc(e.full_name)}</span></button>` : esc(biName(b))}</td><td>${esc(biType(b))}${b.kind ? ` <span class="faint">· ${esc(b.kind)}</span>` : ''}</td><td class="mono">${esc(timeSpan(b))}</td><td>${esc(b.location || '')}${b.room ? ` <span class="faint">#${esc(b.room)}</span>` : ''}</td><td>${chip(c, st)}</td></tr>`; }).join('')}</tbody></table></div></section>`; }).join('')}`;
+}
+function bkTypeView(all){
+  const by = new Map(); all.forEach(b => { const k = biType(b); if(!by.has(k)) by.set(k, []); by.get(k).push(b); });
+  if(!by.size) return '<div class="panel empty">Тохирох захиалга алга.</div>';
+  return [...by].sort((a, b) => b[1].length - a[1].length).map(([t, l]) => `<section class="panel"><div class="panel-head"><h2>${esc(t)}</h2><div class="chips-row"><span class="chip chip-acc">${l.length} хүн</span>${deptChips(l)}</div></div>
+    <div class="panel-body bk-sess">${bkGroups(l).sort((a, b) => (a[0].start_on || '9').localeCompare(b[0].start_on || '9')).map(g => `<div><div class="lbl-s" style="margin-bottom:6px">${g[0].start_on ? `${fmtDate(g[0].start_on)} · ${WD[parseYmd(g[0].start_on).getDay()]}` : 'Огноо тодорхойгүй'}</div>${sessionCard(g)}</div>`).join('')}</div></section>`).join('');
+}
+function bkForm(tid, ids){
+  const types = sortedTypes(); tid = tid ?? types[0]?.id; const checked = new Set(ids || []);
+  return `<form data-form="booking" style="display:flex;flex-direction:column;gap:12px">
+    <div class="field"><label for="bk-type">Сургалт</label><select class="inp" id="bk-type" name="training_type_id" data-bkt>${types.map(t => `<option value="${t.id}" ${t.id===tid?'selected':''}>${esc(t.name)}</option>`).join('')}</select></div>
+    <div class="grid2"><div class="field"><label for="bk-s">Огноо</label><input class="inp mono" id="bk-s" type="date" name="start_on" required></div>
+      <div class="field"><label>Цаг</label><span style="display:flex;gap:6px"><input class="inp mono" type="time" name="start_time" value="08:00" aria-label="Эхлэх цаг"><input class="inp mono" type="time" name="end_time" value="17:00" aria-label="Дуусах цаг"></span></div></div>
+    <div class="grid2"><div class="field"><label for="bk-loc">Байршил</label><input class="inp" id="bk-loc" name="location" placeholder="OSTC, Hazard Park…"></div>
+      <div class="field"><label for="bk-room">Анги №</label><input class="inp" id="bk-room" name="room"></div></div>
+    <div class="toolbar"><input class="inp search" id="b-q" type="search" placeholder="Ажилтан хайх" data-bulk="q" aria-label="Ажилтан хайх"><select class="inp" id="b-dept" data-bulk="dept" aria-label="Алба"><option value="">Бүх алба</option>${sortedDepts().map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select>
+      <button class="btn btn-sm" type="button" data-act="bulk-all">Харагдаж буйг сонгох</button></div>
+    <p class="note" style="margin:-4px 0 0">Дууссан, дуусах дөхсөн хүмүүс дээрээ жагсана.</p>
+    <div class="pick-list" id="bk-pick">${bkPick(tid, checked)}</div>
+    <div class="m-foot"><span class="muted" id="b-count" style="margin-right:auto;align-self:center">${checked.size} сонгосон</span><button class="btn" type="button" data-act="close">Болих</button><button class="btn btn-primary" type="submit">Хадгалах</button></div></form>`;
 }
 function bkPick(typeId, checked){
   const cur = new Map(activeCurrent().filter(c => c.training_type_id === typeId).map(c => [c.employee_id, c]));
@@ -1245,23 +1341,104 @@ function bkPick(typeId, checked){
   return emps.map(e => { const c = cur.get(e.id);
     return `<label data-dept="${e.department_id??''}" data-s="${esc((e.full_name+' '+(e.emp_code||'')+' '+(e.position||'')).toLowerCase())}"><input type="checkbox" name="emp" value="${e.id}" ${checked.has(e.id)?'checked':''}>${avatar(e,'sm')}<span style="min-width:0;display:flex;justify-content:space-between;gap:8px;align-items:center"><span>${esc(e.full_name)} <span class="p-sub">· ${esc(deptName(e.department_id))}</span></span>${c ? chip(c.status, daysText(c.days)) : chip('none','Бүртгэлгүй')}</span></label>`; }).join('');
 }
-function bkForm(b){
-  const types = sortedTypes(), tid = b.training_type_id ?? types[0]?.id, checked = new Set(b.employee_ids || []);
-  return `<form data-form="booking" style="display:flex;flex-direction:column;gap:12px"><input type="hidden" name="id" value="${b.id||''}">
-    <div class="grid2"><div class="field"><label for="bk-type">Сургалт</label><select class="inp" id="bk-type" name="training_type_id" data-bkt>${types.map(t => `<option value="${t.id}" ${t.id===tid?'selected':''}>${esc(t.name)}</option>`).join('')}</select></div>
-      <div class="field"><label for="bk-st">Төлөв</label><select class="inp" id="bk-st" name="status">${['planned','confirmed'].map(k => `<option value="${k}" ${(b.status||'planned')===k?'selected':''}>${BK_ST[k][0]}</option>`).join('')}</select></div></div>
-    <div class="grid2"><div class="field"><label for="bk-s">Эхлэх огноо</label><input class="inp mono" id="bk-s" type="date" name="start_on" required value="${esc(b.start_on||'')}"></div>
-      <div class="field"><label for="bk-e">Дуусах огноо</label><input class="inp mono" id="bk-e" type="date" name="end_on" value="${esc(b.end_on||'')}"></div></div>
-    <div class="grid2"><div class="field"><label for="bk-loc">Байршил</label><input class="inp" id="bk-loc" name="location" value="${esc(b.location||'')}" placeholder="Сайт, анги, хот"></div>
-      <div class="field"><label for="bk-prov">Сургалт явуулах байгууллага</label><input class="inp" id="bk-prov" name="provider" value="${esc(b.provider||'')}"></div></div>
-    <div class="grid2"><div class="field"><label for="bk-cap">Суудлын тоо</label><input class="inp mono" id="bk-cap" type="number" min="1" name="capacity" value="${esc(b.capacity??'')}"></div>
-      <div class="field"><label for="bk-cost">Нийт зардал (₮)</label><input class="inp mono" id="bk-cost" type="number" min="0" name="cost" value="${esc(b.cost??'')}"></div></div>
-    <div class="field"><label for="bk-notes">Тэмдэглэл</label><textarea class="inp" id="bk-notes" name="notes" style="min-height:50px">${esc(b.notes||'')}</textarea></div>
-    <div class="toolbar"><input class="inp search" id="b-q" type="search" placeholder="Ажилтан хайх" data-bulk="q" aria-label="Ажилтан хайх"><select class="inp" id="b-dept" data-bulk="dept" aria-label="Алба"><option value="">Бүх алба</option>${sortedDepts().map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select>
-      <button class="btn btn-sm" type="button" data-act="bulk-all">Харагдаж буйг сонгох</button></div>
-    <p class="note" style="margin:-4px 0 0">Дууссан, дуусах дөхсөн хүмүүс дээрээ жагсана.</p>
-    <div class="pick-list" id="bk-pick">${bkPick(tid, checked)}</div>
-    <div class="m-foot"><span class="muted" id="b-count" style="margin-right:auto;align-self:center">${checked.size} сонгосон</span><button class="btn" type="button" data-act="close">Болих</button><button class="btn btn-primary" type="submit">Хадгалах</button></div></form>`;
+
+async function bkMakeTrainings(items, date){
+  const rows = []; for(const b of items){ const t = b.training_type_id && IDX.type.get(b.training_type_id); if(!t || !b.employee_id) continue; const d = date || b.end_on || b.start_on || todayStr();
+    if(S.trs.some(x => x.employee_id === b.employee_id && x.training_type_id === t.id && x.completed_on === d)) continue;
+    rows.push({ employee_id:b.employee_id, training_type_id:t.id, completed_on:d, expires_on:addMonths(d, t.validity_months), provider:b.location || null, notes:'Захиалгаас' }); }
+  if(rows.length) await dbInsert('trainings', rows); return rows.length;
+}
+/* --- Захиалгын Excel импорт --- */
+const MONTHS_EN = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+const isBookSheet = sh => sh.rows.slice(0, 5).some(r => { const h = r.map(normKey); return h.some(x => x.includes('сургалт') && x.includes('нэр')) && h.some(x => x.includes('эхлэх')); });
+const cellTime = v => { if(v == null || v === '') return ''; if(typeof v === 'number'){ const m = Math.round((v % 1) * 1440); return `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`; } const m = String(v).match(/(\d{1,2})[:.](\d{2})/); return m ? `${m[1].padStart(2,'0')}:${m[2]}` : cellStr(v); };
+const BK_MAP = v => { const k = normKey(v); if(!k) return 'planned'; if(/complet|явагдсан|дууссан/.test(k)) return 'done'; if(/cancel|цуцал/.test(k)) return 'cancelled'; if(/notattend|ирээгүй|noshow/.test(k)) return 'noshow'; return 'planned'; };
+function parseBookSheet(sh){
+  let hi = -1; for(let r = 0; r < Math.min(5, sh.rows.length); r++){ const h = sh.rows[r].map(normKey); if(h.some(x => x.includes('эхлэх'))){ hi = r; break; } }
+  if(hi < 0) return null;
+  const H = sh.rows[hi].map(x => cellStr(x).toLowerCase());
+  const find = (re, from = 0) => H.findIndex((x, i) => i >= from && re.test(x));
+  const c = { dept:find(/^алба/), pos:find(/албан\s*тушаал/), code:find(/^(сап|sap|код|employee\s*id)/), name:find(/овог|нэр$/), tr:find(/сургалтын\s*нэр|program|training/),
+    start:find(/эхлэх\s*өдөр|start\s*date/), end:find(/дуусах\s*өдөр|end\s*date/), st:find(/эхлэх\s*цаг|start\s*time/), et:find(/дуусах\s*цаг|end\s*time/), loc:find(/байршил|location/),
+    room:find(/анги|room/), proc:find(/захиалгын\s*процесс|process/), perf:find(/гүйцэтгэл|status/), teacher:find(/багш|teacher|trainer/), note:find(/тайлбар|note|comment/) };
+  const trI = c.tr; c.kind = H.findIndex((x, i) => i > trI && /^төрөл$/.test(x)); if(c.kind < 0) c.kind = find(/^төрөл$/);
+  const g = (r, k) => c[k] >= 0 ? r[c[k]] : '';
+  const out = []; let lastDept = '', lastName = '', lastCode = '';
+  for(const r of sh.rows.slice(hi + 1)){
+    let name = cleanName(g(r, 'name')), code = cellStr(g(r, 'code')), dept = cellStr(g(r, 'dept'));
+    if(dept) lastDept = dept; if(name){ if(name !== lastName) { lastName = name; } } if(code) lastCode = code;
+    const tr = cellStr(g(r, 'tr')); if(!tr || !name) continue;
+    const sd = cellDate(g(r, 'start')), rawStart = cellStr(g(r, 'start'));
+    const perf = cellStr(g(r, 'perf')), err = /^#|missing/i.test(perf);
+    out.push({ code, name, dept: dept || lastDept, pos:cellStr(g(r, 'pos')), tr, kind:cellStr(g(r, 'kind')), start_on:sd, end_on:cellDate(g(r, 'end')) || sd,
+      start_time:cellTime(g(r, 'st')), end_time:cellTime(g(r, 'et')), location:cellStr(g(r, 'loc')).replace(/ /g, '').trim(), room:cellStr(g(r, 'room')),
+      process:cellStr(g(r, 'proc')), status:BK_MAP(err ? '' : perf), teacher:cellStr(g(r, 'teacher')),
+      note:[cellStr(g(r, 'note')), !sd && rawStart ? 'Огноо: ' + rawStart : '', err && /missing/i.test(perf) ? 'SAP дутуу' : ''].filter(Boolean).join(' · ') || null });
+  }
+  const ds = out.map(x => x.start_on).filter(Boolean).sort(), mi = MONTHS_EN.indexOf(sh.name.trim().toLowerCase());
+  const year = ds.length ? ds[Math.floor(ds.length / 2)].slice(0, 4) : todayStr().slice(0, 4);
+  const month = mi >= 0 ? `${year}-${String(mi + 1).padStart(2, '0')}` : (ds.length ? ds[Math.floor(ds.length / 2)].slice(0, 7) : sh.name);
+  return { sheet:sh.name, month, rows:out };
+}
+function planBook(parsed){
+  const byCode = new Map(S.emps.filter(e => e.emp_code).map(e => [codeK(e.emp_code), e]));
+  const byName = new Map(); S.emps.forEach(e => nameKeys(e.full_name).forEach(k => { if(!byName.has(k)) byName.set(k, []); byName.get(k).push(e); }));
+  const typeMap = new Map(S.types.map(t => [normKey(t.name), t]));
+  const ex = new Map(S.bitems.filter(b => b.import_key).map(b => [b.import_key, b]));
+  const out = { ins:[], upd:[], same:0, dups:0, del:[], unmatched:new Set(), unknownTypes:new Set(), months:new Set() }, seen = new Set();
+  for(const P of parsed){
+    out.months.add(P.month);
+    for(const r of P.rows){
+      let e = r.code && byCode.get(codeK(r.code)); if(!e){ for(const k of nameKeys(r.name)){ const c = byName.get(k) || []; if(c.length === 1){ e = c[0]; break; } } }
+      if(!e) out.unmatched.add(r.name);
+      const t = typeMap.get(normKey(r.tr)); if(!t) out.unknownTypes.add(r.tr);
+      const key = [P.month, codeK(r.code) || normKey(r.name), normKey(r.tr), r.start_on || 'x'].join('|'); if(seen.has(key)){ out.dups++; continue; } seen.add(key);
+      const row = { month:P.month, sheet:P.sheet, employee_id:e?.id ?? null, emp_code:r.code || e?.emp_code || null, full_name:r.name, dept_name:r.dept || null, position:r.pos || null,
+        training_type_id:t?.id ?? null, training_name:r.tr, kind:r.kind || null, start_on:r.start_on, end_on:r.end_on, start_time:r.start_time || null, end_time:r.end_time || null,
+        location:r.location || null, room:r.room || null, process:r.process || null, status:r.status, teacher:r.teacher || null, note:r.note, import_key:key };
+      const old = ex.get(key);
+      if(!old) out.ins.push(row);
+      else { const patch = {}; for(const k of Object.keys(row)) if(String(row[k] ?? '') !== String(old[k] ?? '')) patch[k] = row[k];
+        if(old.status !== 'planned' && row.status === 'planned') delete patch.status; // гараар тэмдэглэсэн төлвийг хадгална
+        if(Object.keys(patch).length) out.upd.push({ id:old.id, patch }); else out.same++; }
+    }
+  }
+  out.del = S.bitems.filter(b => b.import_key && out.months.has(b.month) && !seen.has(b.import_key) && b.status === 'planned').map(b => b.id);
+  return out;
+}
+async function startBookImport(file, sheets){
+  try{
+    sheets ||= await readSheets(file);
+    const bs = sheets.filter(isBookSheet).map(parseBookSheet).filter(x => x && x.rows.length);
+    if(!bs.length) throw new Error('Захиалгын sheet олдсонгүй ("Сургалтын нэр", "Сургалт эхлэх өдөр" баганатай)');
+    const cur = todayStr().slice(0, 7);
+    const pick = new Set([(bs.find(x => x.month === cur) || bs[bs.length - 1]).sheet]);
+    S.bim = { file:file.name, bs, pick, delMissing:true };
+    renderBookImport();
+  } catch(e){ console.error(e); closeModal(); toast(e.message || String(e), 'bad'); }
+}
+function renderBookImport(){
+  const im = S.bim, sel = im.bs.filter(x => im.pick.has(x.sheet)), pl = planBook(sel); im.plan = pl;
+  const n = pl.ins.length + pl.upd.length + (im.delMissing ? pl.del.length : 0);
+  openModal({ title:`Захиалга импорт · ${im.file}`, wide:true, body:`
+    <div class="field"><span class="lbl-s">Оруулах сар (sheet)</span><div class="chips-row">${im.bs.map(x => `<label class="check" style="border:1px solid var(--line);border-radius:8px;padding:5px 10px"><input type="checkbox" data-bim="${esc(x.sheet)}" ${im.pick.has(x.sheet) ? 'checked' : ''}>${esc(x.sheet)} <span class="muted">(${x.rows.length})</span></label>`).join('')}</div></div>
+    <div class="imp-sum"><div><b>${pl.ins.length}</b><span>Шинэ захиалга</span></div><div><b>${pl.upd.length}</b><span>Шинэчлэгдэх</span></div><div><b>${pl.same}</b><span>Өөрчлөлтгүй</span></div><div><b>${pl.del.length}</b><span>Файлаас хасагдсан</span></div></div>
+    ${pl.unmatched.size ? `<details class="hist"><summary style="color:var(--warn)">Системд олдоогүй ${pl.unmatched.size} ажилтан (нэрээр нь хадгална)</summary><pre class="code" style="margin-top:6px;max-height:140px;overflow:auto;white-space:pre-wrap">${esc([...pl.unmatched].join('\n'))}</pre></details>` : ''}
+    ${pl.unknownTypes.size ? `<details class="hist"><summary class="muted">Сургалтын төрөлд байхгүй ${pl.unknownTypes.size} нэр</summary><pre class="code" style="margin-top:6px;max-height:140px;overflow:auto;white-space:pre-wrap">${esc([...pl.unknownTypes].join('\n'))}</pre></details>` : ''}
+    ${pl.dups ? `<p class="note" style="margin:0">Excel-д давхар бичигдсэн ${pl.dups} мөрийг (нэг хүн, нэг сургалт, нэг өдөр) нэг болгосон.</p>` : ''}
+    ${pl.del.length ? `<label class="check"><input type="checkbox" data-bim-del ${im.delMissing ? 'checked' : ''}>Файлаас хасагдсан ${pl.del.length} төлөвлөсөн захиалгыг устгах</label>` : ''}
+    <p class="note" style="margin:0">Ижил файлыг дахин оруулахад давхардахгүй: өөрчлөгдсөн мөр л шинэчлэгдэнэ. Сайт дээр "Явагдсан/Цуцалсан" гэж тэмдэглэснийг Excel-ийн хоосон төлөв дарж бичихгүй.</p>
+    <div class="m-foot"><button class="btn" data-act="close">Болих</button><button class="btn btn-primary" data-act="bim-apply" ${n ? '' : 'disabled'}>Оруулах</button></div>` });
+}
+async function applyBookImport(){
+  const im = S.bim, pl = im.plan;
+  if(pl.ins.length) await dbInsert('booking_items', pl.ins);
+  for(const u of pl.upd) await dbUpdate('booking_items', u.id, u.patch);
+  if(im.delMissing && pl.del.length) await dbDeleteMany('booking_items', pl.del);
+  const sheets = [...im.pick].join(', ');
+  try{ await saveSettings({ last_book:{ at:new Date().toISOString(), file:im.file, sheets } }); } catch{ S.settings.last_book = { at:new Date().toISOString(), file:im.file, sheets }; }
+  S.bv = { month:[...pl.months].sort().pop() || '', view:'day', dept:'', status:'', q:'' };
+  return { ins:pl.ins.length, upd:pl.upd.length, del:im.delMissing ? pl.del.length : 0 };
 }
 
 /* --- settings --- */
@@ -1339,7 +1516,7 @@ function openModal({ title, body, wide=false, drawer=false }){
     <header class="m-head"><h2>${esc(title)}</h2><button class="icon-btn" data-act="close" aria-label="Хаах">×</button></header><div class="m-body">${body}</div></div></div>`;
   const first = $('#modal-root .m-body input:not([type=hidden]):not([type=file]), #modal-root .m-body select'); if(first && !drawer) first.focus();
 }
-function closeModal(){ $('#modal-root').innerHTML = ''; S.openEmp = null; S.imp = null; S.bp = null; }
+function closeModal(){ $('#modal-root').innerHTML = ''; S.openEmp = null; S.imp = null; S.bp = null; S.bim = null; }
 function askConfirm(msg, okLabel='Устгах'){
   return new Promise(res => {
     const root = $('#confirm-root');
@@ -1689,6 +1866,7 @@ async function startImport(file){
   openModal({ title:'Файл уншиж байна', body:'<div style="display:grid;place-items:center;padding:24px"><div class="spinner"></div></div>' });
   try{
     const sheets = await readSheets(file);
+    if(sheets.some(isBookSheet) && !sheets.some(sh => /^\s*matrix\s*$/i.test(sh.name))) return startBookImport(file, sheets); // захиалгын файл
     if(!sheets.length) throw new Error('Файл хоосон байна');
     // гарчиг олдох хамгийн их мөртэй sheet-ийг сонгоно
     let si = 0, bestN = -1;
@@ -1877,19 +2055,27 @@ const ACT = {
     const csv = [head, ...rows].map(r => r.map(csvCell).join(',')).join('\n');
     openModal({ title:'Үнэмлэх CSV', wide:true, body:`<textarea class="inp mono" id="exp-csv" style="min-height:260px;font-size:12px" readonly>${esc(csv)}</textarea><div class="m-foot"><button class="btn" data-act="copy-csv">Хуулах</button><button class="btn btn-primary" data-act="dl-csv">Татах (.csv)</button></div>` }); },
   'bk-new': a => { S.openEmp = null; const tid = a.dataset.type ? Number(a.dataset.type) : undefined; const due = tid ? (dueList().find(g => g.tid === tid)?.ids || []) : [];
-    openModal({ title:'Шинэ сургалт захиалга', wide:true, body:bkForm({ training_type_id:tid, employee_ids:due }) }); },
-  'bk-edit': a => { const b = S.books.find(x => x.id === Number(a.dataset.id)); if(b) openModal({ title:'Захиалга засах', wide:true, body:bkForm(b) }); },
-  'bk-view': a => { const b = S.books.find(x => x.id === Number(a.dataset.id)); if(!b) return; openModal({ title:b.title || typeName(b.training_type_id), body:`<p class="note" style="margin:0">${fmtDate(b.start_on)} · ${(b.employee_ids||[]).length} оролцогч</p><div>${(b.employee_ids||[]).map(id => IDX.emp.get(id)).filter(Boolean).map(e => `<button class="prow" data-act="profile" data-id="${e.id}">${avatar(e,'sm')}<span><span class="p-name">${esc(e.full_name)}</span><br><span class="p-sub">${esc(deptName(e.department_id))} · ${esc(e.position||'')}</span></span><span></span></button>`).join('')}</div>` }); },
-  'bk-st': async a => { const id = Number(a.dataset.id), st = a.dataset.st; if(st === 'cancelled' && !await askConfirm('Энэ захиалгыг цуцлах уу?', 'Цуцлах')) return;
-    await run(() => dbUpdate('training_bookings', id, { status:st }), st === 'cancelled' ? 'Цуцлагдлаа' : 'Баталгаажлаа'); render(); },
-  'bk-del': async a => { if(!await askConfirm('Энэ захиалгыг бүрмөсөн устгах уу? (Үүсгэсэн сургалтын бичлэгүүд хэвээр үлдэнэ.)')) return; await run(() => dbDelete('training_bookings', Number(a.dataset.id)), 'Устгагдлаа'); render(); },
-  'bk-done': a => { const b = S.books.find(x => x.id === Number(a.dataset.id)); if(!b) return; const t = IDX.type.get(b.training_type_id); const d = b.end_on || b.start_on || todayStr();
-    if(!t) return toast('Сургалтын төрөл олдсонгүй','bad');
-    openModal({ title:'Сургалт явагдсан', body:`<form data-form="bk-done" style="display:flex;flex-direction:column;gap:12px"><input type="hidden" name="id" value="${b.id}">
-      <p class="note" style="margin:0">Хамрагдсан хүмүүсийг чагтална. Тэдэнд <b>${esc(t.name)}</b> сургалтын бичлэг үүсч, дуусах огноо нь ${t.validity_months} сараар бодогдоно.</p>
-      <div class="field"><label for="bd-d">Хамрагдсан огноо</label><input class="inp mono" id="bd-d" type="date" name="completed_on" required value="${d}"></div>
-      <div class="pick-list">${(b.employee_ids||[]).map(id => IDX.emp.get(id)).filter(Boolean).map(e => `<label><input type="checkbox" name="emp" value="${e.id}" checked>${avatar(e,'sm')}<span>${esc(e.full_name)} <span class="p-sub">· ${esc(deptName(e.department_id))}</span></span></label>`).join('')}</div>
+    openModal({ title:'Сургалт захиалах', wide:true, body:bkForm(tid, due) }); },
+  'bk-view': a => { S.bv.view = a.dataset.v; render(); },
+  'bk-dept': a => { S.bv.dept = a.dataset.d; render(); },
+  'bk-item': (a, ev) => { ev.stopPropagation(); const b = S.bitems.find(x => x.id === Number(a.dataset.id)); if(!b) return;
+    openModal({ title:biName(b), body:`<p class="note" style="margin:0">${esc(biType(b))} · ${b.start_on ? fmtDate(b.start_on) : 'огноогүй'} ${esc(timeSpan(b))}</p>
+      <div class="chips-row">${Object.entries(BK).map(([k, [l]]) => `<button class="btn btn-sm ${b.status === k ? 'btn-primary' : ''}" data-act="bk-set" data-id="${b.id}" data-st="${k}">${l}</button>`).join('')}</div>
+      <div class="m-foot" style="justify-content:space-between"><button class="btn btn-danger" data-act="bk-rm" data-id="${b.id}">Захиалгаас хасах</button><button class="btn" data-act="close">Хаах</button></div>` }); },
+  'bk-set': async a => { const b = S.bitems.find(x => x.id === Number(a.dataset.id)); const st = a.dataset.st;
+    const r = await run(async () => { if(st === 'done' && b.status !== 'done') await bkMakeTrainings([b]); await dbUpdate('booking_items', b.id, { status:st }); return true; }, 'Хадгалагдлаа'); if(r){ closeModal(); render(); } },
+  'bk-rm': async a => { if(!await askConfirm('Энэ хүнийг захиалгаас хасах уу?', 'Хасах')) return; await run(() => dbDelete('booking_items', Number(a.dataset.id)), 'Хасагдлаа'); closeModal(); render(); },
+  'bk-cancel': async a => { const ids = a.dataset.ids.split(',').map(Number); if(!await askConfirm(`Энэ хичээлийн ${ids.length} захиалгыг цуцлах уу?`, 'Цуцлах')) return;
+    await run(async () => { for(const id of ids){ const b = S.bitems.find(x => x.id === id); if(b?.status === 'planned') await dbUpdate('booking_items', id, { status:'cancelled' }); } }, 'Цуцлагдлаа'); render(); },
+  'bk-done': a => { const items = a.dataset.ids.split(',').map(Number).map(id => S.bitems.find(x => x.id === id)).filter(b => b && b.status === 'planned'); if(!items.length) return;
+    const b = items[0];
+    openModal({ title:'Сургалт явагдсан', body:`<form data-form="bk-done" style="display:flex;flex-direction:column;gap:12px"><input type="hidden" name="ids" value="${items.map(x => x.id).join(',')}">
+      <p class="note" style="margin:0"><b>${esc(biType(b))}</b>. Хамрагдсан хүмүүсийг чагтална: тэдэнд сургалтын бичлэг үүснэ${b.training_type_id ? '' : ' (энэ сургалт төрлийн жагсаалтад байхгүй тул зөвхөн төлөв өөрчлөгдөнө)'}. Чагтгүй хүмүүс "Ирээгүй" болно.</p>
+      <div class="field"><label for="bd-d">Хамрагдсан огноо</label><input class="inp mono" id="bd-d" type="date" name="completed_on" required value="${b.end_on || b.start_on || todayStr()}"></div>
+      <div class="pick-list">${items.map(x => { const e = x.employee_id && IDX.emp.get(x.employee_id); return `<label><input type="checkbox" name="bi" value="${x.id}" checked>${e ? avatar(e,'sm') : '<span></span>'}<span>${esc(biName(x))} <span class="p-sub">· ${esc(biDept(x))}</span></span></label>`; }).join('')}</div>
       <div class="m-foot"><button class="btn" type="button" data-act="close">Болих</button><button class="btn btn-primary" type="submit">Бүртгэх</button></div></form>` }); },
+  'bim-apply': async a => { a.disabled = true; const r = await run(applyBookImport); if(!r){ a.disabled = false; return; } S.bim = null; closeModal(); S.view = 'book'; render();
+    toast(`Захиалга: +${r.ins} шинэ, ${r.upd} шинэчилсэн${r.del ? `, ${r.del} хассан` : ''}`); },
   'org-edit': a => { const n = S.nodes.find(x => x.id === Number(a.dataset.id)); if(n) openModal({ title:'Хайрцаг засах', body:orgEditForm(n) }); },
   'org-add': async a => { const pid = Number(a.dataset.parent), p = S.nodes.find(n => n.id === pid); if(!p) return;
     const n = await run(() => dbInsert('org_nodes', { department_id:p.department_id, parent_id:pid, title:null, sort:nextSort(p.department_id, pid) })); if(n){ closeModal(); render(); openModal({ title:'Шинэ хайрцаг', body:orgEditForm(n) }); } },
@@ -1919,7 +2105,7 @@ const ACT = {
     Object.assign(S, { ready:false, auth:'login', user:null, admin:false, admins:[], imports:[], depts:[], emps:[], trs:[], types:[], logs:[], view:'dash', org:null });
     closeModal(); document.body.classList.remove('ro'); render(); toast('Системээс гарлаа'); }
 };
-const ADMIN_ACTS = new Set(['lic-types','bk-new','bk-edit','bk-st','bk-del','bk-done','bp-apply','undo-imp','wipe-all','new-emp','edit-emp','del-emp','new-tr','edit-tr','renew','del-tr','bulk','bulk-all','send-now','del-dept','del-type','pick-photo','imp-apply','del-admin']);
+const ADMIN_ACTS = new Set(['lic-types','bk-new','bk-item','bk-set','bk-rm','bk-cancel','bk-done','bim-apply','bp-apply','undo-imp','wipe-all','new-emp','edit-emp','del-emp','new-tr','edit-tr','renew','del-tr','bulk','bulk-all','send-now','del-dept','del-type','pick-photo','imp-apply','del-admin']);
 const denied = () => { toast('Танд засах эрх алга. Админтай холбогдоно уу.','bad'); };
 document.addEventListener('click', ev => { const a = ev.target.closest('[data-act]'); if(!a) return; if(!S.admin && ADMIN_ACTS.has(a.dataset.act)){ ev.preventDefault(); return denied(); } const f = ACT[a.dataset.act]; if(f){ if(a.tagName === 'A') ev.preventDefault(); f(a, ev); } });
 document.addEventListener('keydown', ev => {
@@ -1937,6 +2123,7 @@ function updBulkCount(){ const n = $$('.pick-list input:checked').length; const 
 document.addEventListener('input', ev => {
   const t = ev.target;
   if(t.dataset.filter){ const o = S[t.dataset.filter]; o[t.dataset.key] = t.type === 'checkbox' ? t.checked : t.value; $('#list').innerHTML = t.dataset.filter === 'ef' ? listEmps() : t.dataset.filter === 'lf' ? listLic() : listTrs(); }
+  if(t.dataset.bv !== undefined && S.bv){ S.bv[t.dataset.bv] = t.value; if(t.dataset.bv === 'q'){ $('#bk-body').innerHTML = S.bv.view === 'dept' ? bkDeptView(bkFiltered()) : S.bv.view === 'type' ? bkTypeView(bkFiltered()) : bkDayView(bkFiltered()); } else render(); }
   if('bkt' in t.dataset){ const ch = new Set($$('#bk-pick input:checked').map(i => Number(i.value))); $('#bk-pick').innerHTML = bkPick(Number(t.value), ch); const q = $('#b-q'); if(q) q.dispatchEvent(new Event('input', { bubbles:true })); }
   if(t.dataset.bulk){ const q = $('#b-q').value.trim().toLowerCase(), d = $('#b-dept').value; $$('.pick-list label').forEach(l => l.hidden = (d && l.dataset.dept !== d) || (q && !l.dataset.s.includes(q))); }
   const form = t.form;
@@ -1947,9 +2134,12 @@ document.addEventListener('input', ev => {
 });
 document.addEventListener('change', async ev => {
   const t = ev.target;
-  if(!S.admin && (t.dataset.photo || t.dataset.import || t.dataset.edit || 'bulkphoto' in t.dataset)){ t.value = ''; return denied(); }
+  if(!S.admin && (t.dataset.photo || t.dataset.import || t.dataset.edit || 'bulkphoto' in t.dataset || 'bookimport' in t.dataset)){ t.value = ''; return denied(); }
   if(t.dataset.photo && t.files[0]){ const id = Number(t.dataset.photo); await run(async () => { await uploadPhoto(id, t.files[0]); refresh(); }, 'Зураг хадгалагдлаа'); }
   if(t.dataset.import && t.files[0]){ const f = t.files[0]; t.value = ''; startImport(f); }
+  if('bookimport' in t.dataset && t.files[0]){ const f = t.files[0]; t.value = ''; openModal({ title:'Файл уншиж байна', body:'<div style="display:grid;place-items:center;padding:24px"><div class="spinner"></div></div>' }); startBookImport(f); }
+  if(t.dataset.bim !== undefined && S.bim){ t.checked ? S.bim.pick.add(t.dataset.bim) : S.bim.pick.delete(t.dataset.bim); renderBookImport(); }
+  if('bimDel' in t.dataset && S.bim){ S.bim.delMissing = t.checked; renderBookImport(); }
   if('bulkphoto' in t.dataset && t.files.length){ const fs = [...t.files]; t.value = ''; startBulkPhotos(fs); }
   if(t.dataset.bp === 'overwrite' && S.bp){ S.bp.overwrite = t.checked; renderBulkPhotos(); }
   if(t.dataset.imp && S.imp){
@@ -2004,18 +2194,16 @@ const FORMS = {
     const r = await run(async () => { await dbUpdate('org_nodes', id, { title:f.title.value.trim() || null }); await orgAssign(id, num(f.employee_id.value), false); return true; }, 'Хадгалагдлаа');
     if(r){ closeModal(); render(); } },
   booking: async f => {
-    const id = num(f.id.value), ids = $$('input[name=emp]:checked', f).map(i => Number(i.value));
-    if(f.end_on.value && f.end_on.value < f.start_on.value) return toast('Дуусах огноо эхлэхээс өмнө байна','bad');
-    const row = { training_type_id:Number(f.training_type_id.value), status:f.status.value, start_on:f.start_on.value || null, end_on:f.end_on.value || null, location:f.location.value.trim() || null,
-      provider:f.provider.value.trim() || null, capacity:num(f.capacity.value), cost:num(f.cost.value), notes:f.notes.value.trim() || null, employee_ids:ids };
-    if(row.capacity && ids.length > row.capacity && !await askConfirm(`Суудал ${row.capacity}, сонгосон ${ids.length} хүн байна. Үргэлжлүүлэх үү?`, 'Тийм')) return;
-    if(!id) row.created_by = S.user?.email || null;
-    const r = await run(() => id ? dbUpdate('training_bookings', id, row) : dbInsert('training_bookings', row), 'Захиалга хадгалагдлаа'); if(r){ closeModal(); render(); } },
+    const ids = $$('input[name=emp]:checked', f).map(i => Number(i.value)); if(!ids.length) return toast('Ажилтан сонгоно уу','bad');
+    const t = IDX.type.get(Number(f.training_type_id.value)), d = f.start_on.value;
+    const rows = ids.map(id => { const e = IDX.emp.get(id); return { month:d.slice(0,7), employee_id:id, emp_code:e.emp_code, full_name:e.full_name, dept_name:deptName(e.department_id), position:e.position,
+      training_type_id:t.id, training_name:t.name, start_on:d, end_on:d, start_time:f.start_time.value || null, end_time:f.end_time.value || null, location:f.location.value.trim() || null, room:f.room.value.trim() || null, process:'Booked', status:'planned' }; });
+    const r = await run(() => dbInsert('booking_items', rows), `${rows.length} хүнийг захиаллаа`); if(r){ closeModal(); S.view = 'book'; S.bv = { ...(S.bv || {}), month:d.slice(0,7), view:'day', dept:'', status:'', q:'' }; render(); } },
   'bk-done': async f => {
-    const b = S.books.find(x => x.id === Number(f.id.value)), t = IDX.type.get(b.training_type_id), d = f.completed_on.value, ids = $$('input[name=emp]:checked', f).map(i => Number(i.value));
-    const r = await run(async () => { if(ids.length) await dbInsert('trainings', ids.map(e => ({ employee_id:e, training_type_id:t.id, completed_on:d, expires_on:addMonths(d, t.validity_months), provider:b.provider || null, notes:`Захиалга #${b.id}` })));
-      await dbUpdate('training_bookings', b.id, { status:'done', employee_ids:ids, end_on:b.end_on || d }); return true; }, `${ids.length} ажилтанд сургалт бүртгэгдлээ`);
-    if(r){ closeModal(); render(); } },
+    const all = f.ids.value.split(',').map(Number).map(id => S.bitems.find(x => x.id === id)).filter(Boolean), on = new Set($$('input[name=bi]:checked', f).map(i => Number(i.value))), d = f.completed_on.value;
+    const r = await run(async () => { const yes = all.filter(x => on.has(x.id)); const n = await bkMakeTrainings(yes, d);
+      for(const x of all) await dbUpdate('booking_items', x.id, { status:on.has(x.id) ? 'done' : 'noshow' }); return n; }, n => `${on.size} хүн явагдсан, ${n} сургалтын бичлэг үүслээ`);
+    if(r != null){ closeModal(); render(); } },
   'lic-types': async f => { if(!S.hasLicFlag) return toast('Эхлээд setup.sql-ийг Supabase дээр ажиллуулна уу','bad');
     const on = new Set($$('input[name=lic]:checked', f).map(i => Number(i.value)));
     const r = await run(async () => { for(const t of S.types){ const v = on.has(t.id); if(isLic(t) !== v || t.is_license == null) await dbUpdate('training_types', t.id, { is_license:v }); } return true; }, 'Хадгалагдлаа'); if(r){ closeModal(); render(); } },
