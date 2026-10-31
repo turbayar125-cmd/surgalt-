@@ -518,6 +518,26 @@ function avatarPick(e, size='md'){
   if(!S.admin) return avatar(e, size);
   return `<span class="av-pick ${e.photo_url?'':'no-photo'}" data-act="pick-photo" data-id="${e.id}" role="button" tabindex="0" title="${e.photo_url?'Зураг солих':'Зураг оруулах'} (эсвэл зургаа энд чирж оруулна)" aria-label="${esc(e.full_name)}: зураг ${e.photo_url?'солих':'оруулах'}">${avatar(e,size)}<span class="av-cam" aria-hidden="true">${CAM}</span></span>`;
 }
+const codeKey = c => String(c || '').replace(/[^\w-]/g, '');
+// Ажилтан устаад дахин орж ирсэн ч зураг нь Employee ID-аараа storage-д үлддэг тул автоматаар буцааж холбоно
+async function restorePhotos(){
+  if(DEMO || !S.admin) return 0;
+  const latest = new Map();
+  for(let off = 0; off < 20000; off += 1000){
+    const { data, error } = await sb.storage.from('photos').list('', { limit:1000, offset:off, sortBy:{ column:'name', order:'asc' } });
+    if(error){ console.warn('photos list:', error.message); break; }
+    for(const f of data){ const m = /^code-([\w-]+?)-(\d{10,})\.jpg$/.exec(f.name); if(!m) continue; const p = latest.get(m[1]); if(!p || +m[2] > p.t) latest.set(m[1], { t:+m[2], name:f.name }); }
+    if(data.length < 1000) break;
+  }
+  let n = 0;
+  for(const e of S.emps){
+    const f = latest.get(codeKey(e.emp_code)); if(!f) continue;
+    const url = sb.storage.from('photos').getPublicUrl(f.name).data.publicUrl;
+    if(e.photo_url) continue; // гараар солисон зургийг хөндөхгүй
+    try{ await dbUpdate('employees', e.id, { photo_url:url }); n++; } catch(err){ console.warn(err); }
+  }
+  return n;
+}
 async function setPhoto(id, file){
   if(!file || !/^image\//.test(file.type)) return toast('Зураг (jpg, png…) сонгоно уу','bad');
   $$(`.av-pick[data-id="${id}"]`).forEach(x => x.classList.add('busy'));
@@ -615,6 +635,7 @@ async function loadAll(){
   try{ S.nodes = await fetchAll('org_nodes'); } catch(e){ console.warn('org_nodes:', e.message); S.nodes = []; }
   const il = await sb.from('import_log').select('id,at,file,by_email,summary,data,undone_at').order('at', { ascending:false }).limit(15);
   S.imports = il.error ? [] : il.data;
+  try{ const n = await restorePhotos(); if(n) setTimeout(() => toast(`${n} ажилтны зургийг сэргээлээ`), 600); } catch(e){ console.warn(e); }
 }
 async function dbInsert(table, rows){
   const arr = Array.isArray(rows) ? rows : [rows]; let out = [];
@@ -1611,6 +1632,7 @@ async function applyImport(){
   if(DEMO) S.imports.unshift({ ...logRow, id:++DEMO_ID });
   else { const { data, error } = await sb.from('import_log').insert(logRow).select().single(); if(error) console.warn('import_log:', error.message); else S.imports.unshift(data); }
   summary.log_id = S.imports[0]?.at === summary.at ? S.imports[0].id : null;
+  try{ summary.photos = await restorePhotos(); } catch(e){ console.warn(e); }
   try{ await saveSettings({ last_import:summary }); } catch(e){ console.warn(e); S.settings.last_import = summary; }
   return summary;
 }
@@ -1620,7 +1642,7 @@ async function undoImport(id){
   await dbDeleteMany('trainings', d.trainings || []);
   for(const p of [...(d.patches || [])].reverse()) if(IDX.emp.has(p.id)) await dbUpdate('employees', p.id, p.old);
   for(const f of d.typeFix || []) if(IDX.type.has(f.id)) await dbUpdate('training_types', f.id, { validity_months:f.old });
-  await dbDeleteMany('employees', d.emps || []);
+  for(const id of d.emps || []) if(IDX.emp.get(id)?.active) await dbUpdate('employees', id, { active:false }); // устгахгүй: зураг, бүтэц хадгалагдана
   await dbDeleteMany('training_types', (d.types || []).filter(t => !S.trs.some(r => r.training_type_id === t)));
   await dbDeleteMany('departments', (d.depts || []).filter(x => !S.emps.some(e => e.department_id === x)));
   const at = new Date().toISOString();
@@ -1629,9 +1651,9 @@ async function undoImport(id){
   if(S.settings.last_import?.at === log.at){ const prev = S.imports.find(x => !x.undone_at); try{ await saveSettings({ last_import: prev ? prev.summary : null }); } catch{ S.settings.last_import = prev ? prev.summary : null; } }
   return log;
 }
-async function wipeAll(){
+async function wipeAll(withEmps){
   await dbDeleteMany('trainings', S.trs.map(x => x.id));
-  await dbDeleteMany('employees', S.emps.map(x => x.id));
+  if(withEmps) await dbDeleteMany('employees', S.emps.map(x => x.id));
   const keep = new Set(['bp','mt','cp','qaqc','wh','hse','administration','hr']);
   await dbDeleteMany('departments', S.depts.filter(x => !keep.has(normKey(x.name))).map(x => x.id));
   if(!DEMO){ const { error } = await sb.from('import_log').update({ undone_at:new Date().toISOString() }).is('undone_at', null); if(error) console.warn(error.message); }
@@ -1646,7 +1668,8 @@ const importsPanel = () => {
       ${can ? `<button class="btn btn-sm btn-danger" data-act="undo-imp" data-id="${l.id}">Буцаах</button>` : '<span></span>'}</div>`; };
   return `<div><h4 style="font-size:14px;margin-bottom:4px">Оруулсан файлууд</h4>
     ${list.length ? `<div class="imp-list">${list.map(row).join('')}</div>` : '<p class="note">Одоогоор бүртгэгдсэн импорт алга. (Энэ боломж нэмэгдэхээс өмнө оруулсан файлыг буцаах бол доорх "Бүгдийг цэвэрлэх"-ийг ашиглана.)</p>'}</div>
-    <div class="danger-zone"><span><b style="color:var(--bad)">Бүгдийг цэвэрлэх</b><br><span class="note">Бүх ажилтан, сургалтын бичлэгийг устгаж, 8 үндсэн албыг үлдээнэ. Буруу файл оруулсан бол дахин эхлэхэд хэрэглэнэ.</span></span><button class="btn btn-sm btn-danger" data-act="wipe-all">Бүгдийг устгах</button></div>`;
+    <div class="danger-zone"><span><b style="color:var(--bad)">Сургалтын бүртгэлийг цэвэрлэх</b><br><span class="note">Бүх сургалтын бичлэгийг устгана. <b>Ажилтан, зураг, бүтэц хэвээр үлдэнэ.</b> Дараа нь Excel-ээ дахин оруулна.</span></span><button class="btn btn-sm btn-danger" data-act="wipe-all">Сургалтыг цэвэрлэх</button></div>
+    <div class="danger-zone"><span><b style="color:var(--bad)">Ажилтнуудыг ч устгах</b><br><span class="note">Бүх ажилтан, сургалтыг устгаж 8 үндсэн албыг үлдээнэ (нэр буруу орсон үед). Зургууд storage-д хадгалагдсан тул файлаа дахин оруулахад Employee ID-аар нь автоматаар буцаж холбогдоно.</span></span><button class="btn btn-sm btn-danger" data-act="wipe-all" data-emps="1">Бүгдийг устгах</button></div>`;
 };
 const lastImportText = () => { const l = S.settings.last_import; if(!l) return ''; return `Сүүлд шинэчилсэн: ${fmtDate(String(l.at).slice(0,10))} · ${esc(l.file)} · +${l.trainings} бичлэг`; };
 const importBtn = (label = 'Excel оруулах', cls = 'btn') => `<label class="${cls}" style="cursor:pointer">${label}<input type="file" accept=".xlsx,.xls,.xlsm,.csv,.txt" data-import="file" hidden></label>`;
@@ -1708,13 +1731,14 @@ const ACT = {
   'imp-apply': async a => { a.disabled = true; a.textContent = 'Оруулж байна…';
     const r = await run(applyImport); if(!r){ a.disabled = false; a.textContent = 'Оруулах'; return; }
     S.imp = null; closeModal(); render();
-    openModal({ title:'Импорт амжилттай', body:`<p style="margin:0"><b>${r.trainings}</b> сургалтын бичлэг нэмэгдэж, <b>${r.new_emps}</b> шинэ ажилтан, <b>${r.updated}</b> ажилтны мэдээлэл шинэчлэгдлээ${r.links ? `, <b>${r.links}</b> удирдлагын холбоос тохирууллаа` : ''}${r.deact ? `, <b>${r.deact}</b> ажилтныг ажлаас гарсан болголоо` : ''}.</p>${DEMO ? '<p class="note">Демо горим: хуудсыг дахин ачаалахад өөрчлөлт арилна.</p>' : ''}<div class="m-foot">${r.log_id ? `<button class="btn btn-danger" data-act="undo-imp" data-id="${r.log_id}">Буцаах</button>` : ''}<button class="btn btn-primary" data-act="close">Болсон</button></div>` }); },
+    openModal({ title:'Импорт амжилттай', body:`<p style="margin:0"><b>${r.trainings}</b> сургалтын бичлэг нэмэгдэж, <b>${r.new_emps}</b> шинэ ажилтан, <b>${r.updated}</b> ажилтны мэдээлэл шинэчлэгдлээ${r.links ? `, <b>${r.links}</b> удирдлагын холбоос тохирууллаа` : ''}${r.deact ? `, <b>${r.deact}</b> ажилтныг ажлаас гарсан болголоо` : ''}.${r.photos ? ` <b>${r.photos}</b> ажилтны зургийг сэргээлээ.` : ''}</p>${DEMO ? '<p class="note">Демо горим: хуудсыг дахин ачаалахад өөрчлөлт арилна.</p>' : ''}<div class="m-foot">${r.log_id ? `<button class="btn btn-danger" data-act="undo-imp" data-id="${r.log_id}">Буцаах</button>` : ''}<button class="btn btn-primary" data-act="close">Болсон</button></div>` }); },
   'undo-imp': async a => { const l = S.imports.find(x => x.id === Number(a.dataset.id)); if(!l) return; const d = l.data || {};
     if(!await askConfirm(`"${l.file}" файлаар оруулсныг буцаах уу? ${(d.trainings||[]).length} сургалтын бичлэг, ${(d.emps||[]).length} шинэ ажилтан устаж, ${(d.patches||[]).length} ажилтны мэдээлэл өмнөх байдалдаа орно. Эдгээрт дараа нь гараар хийсэн өөрчлөлт ч арилна.`, 'Буцаах')) return;
     a.disabled = true; const r = await run(() => undoImport(l.id), 'Импорт буцаагдлаа'); a.disabled = false; if(r){ closeModal(); render(); } },
-  'wipe-all': async a => { if(!await askConfirm(`Бүх ${S.emps.length} ажилтан, ${S.trs.length} сургалтын бичлэгийг бүрмөсөн устгах уу? Энэ үйлдлийг буцаах боломжгүй.`, 'Бүгдийг устгах')) return;
-    if(!await askConfirm('Та итгэлтэй байна уу? Сүүлчийн баталгаажуулалт.', 'Тийм, устга')) return;
-    a.disabled = true; const r = await run(async () => { await wipeAll(); return true; }, 'Бүх өгөгдөл цэвэрлэгдлээ'); a.disabled = false; if(r) render(); },
+  'wipe-all': async a => { const all = !!a.dataset.emps;
+    if(!await askConfirm(all ? `Бүх ${S.emps.length} ажилтан, ${S.trs.length} сургалтын бичлэгийг устгах уу? (Зургууд storage-д үлдэнэ.)` : `Бүх ${S.trs.length} сургалтын бичлэгийг устгах уу? Ажилтан, зураг хэвээр үлдэнэ.`, all ? 'Бүгдийг устгах' : 'Цэвэрлэх')) return;
+    if(all && !await askConfirm('Та итгэлтэй байна уу? Сүүлчийн баталгаажуулалт.', 'Тийм, устга')) return;
+    a.disabled = true; const r = await run(async () => { await wipeAll(all); return true; }, all ? 'Бүх өгөгдөл цэвэрлэгдлээ' : 'Сургалтын бүртгэл цэвэрлэгдлээ'); a.disabled = false; if(r) render(); },
   logout: async () => { if(!await askConfirm('Системээс гарах уу?', 'Гарах')) return;
     try{ await sb.auth.signOut({ scope:'local' }); } catch(e){ console.warn(e); }
     Object.assign(S, { ready:false, auth:'login', user:null, admin:false, admins:[], imports:[], depts:[], emps:[], trs:[], types:[], logs:[], view:'dash', org:null });
