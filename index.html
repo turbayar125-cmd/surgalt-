@@ -173,6 +173,23 @@ textarea.inp{resize:vertical;min-height:70px}
 .chip-bad{background:var(--bad-soft);color:var(--bad)}
 .chip-none{background:var(--none-soft);color:var(--none)}
 .chip-plain{background:var(--surface-2);color:var(--muted)}
+.chip-acc{background:var(--accent-soft);color:var(--accent)}
+.bk-list{display:flex;flex-direction:column;gap:10px}
+.bk{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:6px 16px;align-items:start}
+.bk-date{width:58px;border-radius:10px;background:var(--accent-soft);color:var(--accent);text-align:center;padding:6px 0;line-height:1.1;grid-row:span 2}
+.bk-date b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
+.bk-date span{font-size:11px;font-weight:600}
+.bk.done .bk-date{background:var(--ok-soft);color:var(--ok)} .bk.cancelled{opacity:.6} .bk.cancelled .bk-date{background:var(--none-soft);color:var(--none)}
+.bk-title{font-weight:600;font-size:15px}
+.bk-meta{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--muted)}
+.bk-act{grid-column:2/-1;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.due-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line-2)}
+.due-row:last-child{border-bottom:0}
+.lic-types{display:flex;flex-wrap:wrap;gap:8px}
+.lic-type{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 12px;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:2px;min-width:150px}
+.lic-type:hover,.lic-type.on{border-color:var(--accent)} .lic-type.on{background:var(--accent-soft)}
+.lic-type b{font-size:13px} .lic-type span{font-size:12px;color:var(--muted)}
+@media (max-width:640px){.bk{grid-template-columns:auto minmax(0,1fr)} .bk>.chip{grid-column:2}}
 .chip-plain::before{display:none}
 
 /* avatar */
@@ -428,7 +445,7 @@ const CONFIG = {
 const DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
 const sb = (!DEMO && window.supabase) ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY) : null;
 
-const TABLES = { departments:'depts', employees:'emps', training_types:'types', trainings:'trs', reminder_log:'logs', org_nodes:'nodes' };
+const TABLES = { training_bookings:'books', departments:'depts', employees:'emps', training_types:'types', trainings:'trs', reminder_log:'logs', org_nodes:'nodes' };
 const S = {
   ready:false, auth:null, user:null, view:'dash',
   depts:[], emps:[], types:[], trs:[], logs:[],
@@ -620,7 +637,7 @@ async function fetchAll(table){
   return out;
 }
 async function loadAll(){
-  if(DEMO){ S.extra = true; seedDemo(); S.imports = []; S.nodes = []; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
+  if(DEMO){ S.extra = true; seedDemo(); S.imports = []; S.nodes = []; S.books = []; S.hasBook = true; S.hasLicFlag = true; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
   const [d,e,t,tr] = await Promise.all(['departments','employees','training_types','trainings'].map(fetchAll));
   const l = await sb.from('reminder_log').select('*').order('sent_at',{ascending:false}).limit(2000);
   const s = await sb.from('settings').select('*').eq('id',1).maybeSingle();
@@ -633,6 +650,8 @@ async function loadAll(){
   S.admins = [];
   if(S.admin){ const a = await sb.from('app_admins').select('*').order('added_at'); if(!a.error) S.admins = a.data; }
   { const t = await sb.from('employees').select('roster,poi').limit(1); S.extra = !t.error; }
+  try{ S.books = await fetchAll('training_bookings'); S.hasBook = true; } catch(e){ console.warn('bookings:', e.message); S.books = []; S.hasBook = false; }
+  { const t = await sb.from('training_types').select('is_license').limit(1); S.hasLicFlag = !t.error; }
   try{ S.nodes = await fetchAll('org_nodes'); } catch(e){ console.warn('org_nodes:', e.message); S.nodes = []; }
   const il = await sb.from('import_log').select('id,at,file,by_email,summary,data,undone_at').order('at', { ascending:false }).limit(15);
   S.imports = il.error ? [] : il.data;
@@ -776,6 +795,8 @@ function seedDemo(){
 const I = {
   dash:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>',
   emps:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6"/><path d="M16 4a4 4 0 0 1 0 8M22 21c0-3-1.5-5-4-5.7"/></svg>',
+  lic:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2.5"/><path d="M13 10h6M13 14h4"/></svg>',
+  book:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18M9 15l2 2 4-4"/></svg>',
   trs:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>',
   settings:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   org:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="5" rx="1"/><rect x="2" y="17" width="6" height="5" rx="1"/><rect x="16" y="17" width="6" height="5" rx="1"/><path d="M12 7v5M5 17v-2.5h14V17M12 12v2.5"/></svg>',
@@ -795,7 +816,7 @@ function render(){
   const bad = activeCurrent().filter(c => c.status === 'bad').length;
   document.body.classList.toggle('ro', !S.admin);
   if(!S.admin && S.view === 'settings') S.view = 'dash';
-  const nav = [['dash','Хянах самбар'],['org','Алба'],['emps','Ажилтнууд'],['trs','Сургалтын бүртгэл'], ...(S.admin ? [['settings','Тохиргоо']] : [])];
+  const nav = [['dash','Хянах самбар'],['org','Алба'],['emps','Ажилтнууд'],['trs','Сургалтын бүртгэл'],['book','Сургалт захиалга'],['lic','Эрхийн үнэмлэх'], ...(S.admin ? [['settings','Тохиргоо']] : [])];
   app.innerHTML = `<div class="shell">
     <aside class="side">
       <div class="brand"><img class="brand-logo" src="logo-dark.png" alt="Premium"><img class="brand-mark-img" src="logo-mark.png" alt="Premium"><span class="brand-app">Сургалтын бүртгэл</span></div>
@@ -1124,6 +1145,125 @@ function listTrs(){
   </tbody></table></div>`;
 }
 
+/* --- Монгол улсын эрхийн үнэмлэх --- */
+const isLic = t => t ? (t.is_license != null ? !!t.is_license : /^\s*mgl\b|licen[cs]e|үнэмлэх/i.test(t.name)) : false;
+const licTypes = () => sortedTypes().filter(isLic);
+function viewLic(){
+  const f = S.lf ||= { q:'', dept:'', type:'', status:'' };
+  const types = licTypes(), tset = new Set(types.map(t => t.id));
+  const all = activeCurrent().filter(c => tset.has(c.training_type_id));
+  const n = { ok:0, warn:0, bad:0 }; all.forEach(c => n[c.status]++);
+  const holders = new Set(all.map(c => c.employee_id)).size;
+  const tile = (cls, lbl, val, sub, st) => `<button class="tile ${cls}" data-act="lic-f" data-st="${st}"><span class="t-lbl">${lbl}</span><span class="t-num">${val}</span><span class="t-sub">${sub}</span></button>`;
+  return `<div class="page-head"><div><h1>Монгол улсын эрхийн үнэмлэх</h1><p>${types.length} төрлийн үнэмлэх · ${holders} ажилтанд ${all.length} үнэмлэх</p></div>
+    <div class="actions">${S.admin ? '<button class="btn" data-act="lic-types">Үнэмлэхийн төрөл сонгох</button>' : ''}<button class="btn" data-act="lic-export">CSV экспорт</button></div></div>
+  <div class="tiles">
+    ${tile('ok','Хүчинтэй', n.ok, `Нийт ${all.length}-аас ${all.length ? Math.round(n.ok/all.length*100) : 0}%`, 'ok')}
+    ${tile('warn',`${warnDays()} хоногт дуусах`, n.warn, 'Сунгалтад бэлдэх', 'warn')}
+    ${tile('bad','Хугацаа дууссан', n.bad, 'Ажиллуулахгүй байх', 'bad')}
+    ${tile('','Үнэмлэхтэй ажилтан', holders, 'Дор хаяж нэг', '')}
+  </div>
+  ${types.length ? `<div class="lic-types">${types.map(t => { const l = all.filter(c => c.training_type_id === t.id), b = l.filter(c => c.status !== 'ok').length;
+      return `<button class="lic-type ${String(f.type) === String(t.id) ? 'on' : ''}" data-act="lic-type" data-id="${t.id}"><b>${esc(t.name.replace(/\s*\(P\)\s*$/,''))}</b><span>${l.length} хүн${b ? ` · <span style="color:var(--bad)">${b} анхаарах</span>` : ''}</span></button>`; }).join('')}</div>`
+    : `<div class="panel empty">Үнэмлэхийн төрөл олдсонгүй. ${S.admin ? '"Үнэмлэхийн төрөл сонгох" дарж аль сургалт нь үнэмлэх болохыг сонгоно.' : ''}</div>`}
+  <div class="toolbar">
+    <input class="inp search" type="search" placeholder="Нэр, код, үнэмлэхний дугаар" value="${esc(f.q)}" data-filter="lf" data-key="q" aria-label="Хайх">
+    <select class="inp" data-filter="lf" data-key="dept" aria-label="Алба"><option value="">Бүх алба</option>${sortedDepts().map(d => `<option value="${d.id}" ${f.dept==d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select>
+    <select class="inp" data-filter="lf" data-key="type" aria-label="Үнэмлэх"><option value="">Бүх үнэмлэх</option>${types.map(t => `<option value="${t.id}" ${f.type==t.id?'selected':''}>${esc(t.name)}</option>`).join('')}</select>
+    <select class="inp" data-filter="lf" data-key="status" aria-label="Төлөв"><option value="">Бүх төлөв</option>${['bad','warn','ok'].map(s => `<option value="${s}" ${f.status===s?'selected':''}>${ST[s]}</option>`).join('')}</select>
+  </div>
+  <div id="list">${listLic()}</div>`;
+}
+function filteredLic(){
+  const f = S.lf, q = f.q.trim().toLowerCase(), tset = new Set(licTypes().map(t => t.id));
+  return activeCurrent().filter(c => { const e = IDX.emp.get(c.employee_id);
+    return tset.has(c.training_type_id) && (!f.dept || String(e.department_id) === String(f.dept)) && (!f.type || String(c.training_type_id) === String(f.type)) && (!f.status || c.status === f.status)
+      && (!q || (e.full_name + ' ' + (e.emp_code||'') + ' ' + (c.certificate_no||'')).toLowerCase().includes(q)); }).sort((a,b) => a.days - b.days);
+}
+function listLic(){
+  const l = filteredLic();
+  if(!l.length) return `<div class="panel empty">Тохирох үнэмлэх олдсонгүй.</div>`;
+  return `<p class="count">${l.length} үнэмлэх</p><div class="panel tbl-wrap"><table class="tbl"><thead><tr><th>Ажилтан</th><th>Үнэмлэх</th><th>Дугаар</th><th>Олгосон</th><th>Дуусах</th><th>Төлөв</th><th></th></tr></thead><tbody>
+  ${l.map(c => { const e = IDX.emp.get(c.employee_id); return `<tr>
+    <td><button class="who btn-link" data-act="profile" data-id="${e.id}" style="color:inherit">${avatar(e,'sm')}<span style="text-align:left"><b style="font-weight:500">${esc(e.full_name)}</b><br><span class="p-sub">${esc(deptName(e.department_id))} · ${esc(e.position||'')}</span></span></button></td>
+    <td>${esc(typeName(c.training_type_id))}</td><td class="mono">${esc(c.certificate_no||'—')}</td><td class="mono">${fmtDate(c.completed_on)}</td><td class="mono">${fmtDate(c.expires_on)}</td>
+    <td>${chip(c.status, daysText(c.days))}</td><td class="num">${S.admin ? `<button class="btn btn-sm" data-act="edit-tr" data-id="${c.id}">Засах</button> <button class="btn btn-sm" data-act="renew" data-id="${c.id}">Сунгах</button>` : ''}</td></tr>`; }).join('')}
+  </tbody></table></div>`;
+}
+
+/* --- Сургалт захиалга --- */
+const BK_ST = { planned:['Төлөвлөсөн','plain'], confirmed:['Баталгаажсан','acc'], done:['Явагдсан','ok'], cancelled:['Цуцалсан','none'] };
+const MON = ['1-р сар','2-р сар','3-р сар','4-р сар','5-р сар','6-р сар','7-р сар','8-р сар','9-р сар','10-р сар','11-р сар','12-р сар'];
+const money = v => v == null || v === '' ? '' : Number(v).toLocaleString('en-US') + '₮';
+const openBooks = () => S.books.filter(b => b.status === 'planned' || b.status === 'confirmed');
+function dueList(){
+  const booked = new Map(); openBooks().forEach(b => (b.employee_ids||[]).forEach(id => booked.set(b.training_type_id + ':' + id, b)));
+  const by = new Map();
+  for(const c of activeCurrent()){ if(c.days > 60 || booked.has(c.training_type_id + ':' + c.employee_id)) continue;
+    if(!by.has(c.training_type_id)) by.set(c.training_type_id, { bad:0, warn:0, ids:[] }); const g = by.get(c.training_type_id); g.ids.push(c.employee_id); c.days < 0 ? g.bad++ : g.warn++; }
+  return [...by].map(([tid, g]) => ({ tid, ...g })).sort((a, b) => b.ids.length - a.ids.length);
+}
+function viewBook(){
+  if(!S.hasBook) return `<div class="page-head"><div><h1>Сургалт захиалгын мэдээлэл</h1></div></div><div class="panel panel-body"><p class="note">Энэ хэсгийг ашиглахын тулд Supabase дээр шинэчлэгдсэн <b>setup.sql</b>-ийг дахин ажиллуулна уу.</p></div>`;
+  const today = todayStr(), up = openBooks().sort((a,b) => (a.start_on||'9').localeCompare(b.start_on||'9')), past = S.books.filter(b => !up.includes(b)).sort((a,b) => (b.start_on||'').localeCompare(a.start_on||''));
+  const ppl = up.reduce((s, b) => s + (b.employee_ids||[]).length, 0), cost = up.reduce((s, b) => s + (Number(b.cost)||0), 0);
+  const due = dueList(), dueN = due.reduce((s, g) => s + g.ids.length, 0);
+  const tile = (cls, lbl, val, sub) => `<div class="tile ${cls}" style="cursor:default"><span class="t-lbl">${lbl}</span><span class="t-num">${val}</span><span class="t-sub">${sub}</span></div>`;
+  return `<div class="page-head"><div><h1>Сургалт захиалгын мэдээлэл</h1><p>Төлөвлөсөн сургалт, оролцогч, зардал</p></div>
+    <div class="actions">${S.admin ? '<button class="btn btn-primary" data-act="bk-new">+ Шинэ захиалга</button>' : ''}</div></div>
+  <div class="tiles">
+    ${tile('', 'Хүлээгдэж буй захиалга', up.length, `Ойрын: ${up[0]?.start_on ? fmtDate(up[0].start_on) : '—'}`)}
+    ${tile('ok', 'Хамрагдах ажилтан', ppl, 'Нээлттэй захиалгуудад')}
+    ${tile('warn', 'Захиалга хэрэгтэй', dueN, '60 хоногт дуусах / дууссан')}
+    ${tile('', 'Төлөвлөсөн зардал', cost ? money(cost) : '—', 'Нээлттэй захиалгуудын')}
+  </div>
+  <div class="cols">
+    <section class="panel"><div class="panel-head"><h2>Хүлээгдэж буй захиалга</h2><span class="chip chip-plain">${up.length}</span></div>
+      <div class="panel-body">${up.length ? `<div class="bk-list">${up.map(bkCard).join('')}</div>` : '<div class="empty">Захиалга алга.</div>'}</div></section>
+    <section class="panel"><div class="panel-head"><h2>Захиалга хэрэгтэй сургалт</h2><span class="note">Захиалгад ороогүй хүмүүс</span></div>
+      <div class="panel-body" style="padding-block:4px">${due.length ? due.slice(0, 12).map(g => `<div class="due-row"><span style="min-width:0"><b style="font-weight:500">${esc(typeName(g.tid))}</b><br><span class="p-sub">${g.bad ? `<span style="color:var(--bad)">${g.bad} дууссан</span>` : ''}${g.bad && g.warn ? ' · ' : ''}${g.warn ? `<span style="color:var(--warn)">${g.warn} дуусах дөхсөн</span>` : ''}</span></span>
+        <span class="chip chip-plain">${g.ids.length} хүн</span>${S.admin ? `<button class="btn btn-sm" data-act="bk-new" data-type="${g.tid}">Захиалах</button>` : '<span></span>'}</div>`).join('') : '<div class="empty">Бүх хүн хамрагдсан эсвэл захиалгад орсон байна.</div>'}</div></section>
+  </div>
+  ${past.length ? `<section class="panel"><div class="panel-head"><h2>Өмнөх захиалгууд</h2><span class="chip chip-plain">${past.length}</span></div><div class="panel-body"><div class="bk-list">${past.slice(0, 30).map(bkCard).join('')}</div></div></section>` : ''}`;
+}
+function bkCard(b){
+  const d = b.start_on ? parseYmd(b.start_on) : null, [stl, stc] = BK_ST[b.status] || BK_ST.planned, ids = b.employee_ids || [];
+  const faces = ids.slice(0, 6).map(id => IDX.emp.get(id)).filter(Boolean);
+  return `<div class="bk ${b.status}"><div class="bk-date">${d ? `<b>${d.getDate()}</b><span>${MON[d.getMonth()]}</span>` : '<b>—</b>'}</div>
+    <div style="min-width:0"><div class="bk-title">${esc(b.title || typeName(b.training_type_id))}</div>
+      <div class="bk-meta">${b.start_on ? `<span>${fmtDate(b.start_on)}${b.end_on && b.end_on !== b.start_on ? ' – ' + fmtDate(b.end_on) : ''}</span>` : ''}${b.location ? `<span>📍 ${esc(b.location)}</span>` : ''}${b.provider ? `<span>${esc(b.provider)}</span>` : ''}<span>${ids.length}${b.capacity ? '/' + b.capacity : ''} хүн</span>${b.cost ? `<span>${money(b.cost)}</span>` : ''}</div>
+      ${b.notes ? `<div class="bk-meta" style="margin-top:2px">${esc(b.notes)}</div>` : ''}</div>
+    ${chip(stc, stl)}
+    <div class="bk-act"><span class="faces">${faces.map(e => avatar(e,'sm')).join('')}</span>
+      ${S.admin && (b.status === 'planned' || b.status === 'confirmed') ? `<button class="btn btn-sm" data-act="bk-edit" data-id="${b.id}">Засах</button>${b.status === 'planned' ? `<button class="btn btn-sm" data-act="bk-st" data-st="confirmed" data-id="${b.id}">Баталгаажуулах</button>` : ''}<button class="btn btn-sm btn-primary" data-act="bk-done" data-id="${b.id}">Явагдсан</button><button class="btn btn-sm btn-danger" data-act="bk-st" data-st="cancelled" data-id="${b.id}">Цуцлах</button>`
+        : `<button class="btn btn-sm" data-act="bk-view" data-id="${b.id}">Оролцогчид</button>${S.admin ? `<button class="btn btn-sm btn-danger" data-act="bk-del" data-id="${b.id}">Устгах</button>` : ''}`}</div></div>`;
+}
+function bkPick(typeId, checked){
+  const cur = new Map(activeCurrent().filter(c => c.training_type_id === typeId).map(c => [c.employee_id, c]));
+  const rank = e => { const c = cur.get(e.id); return c ? (c.days < 0 ? 0 : c.days <= 60 ? 1 : 3) : 2; };
+  const emps = S.emps.filter(e => e.active).sort((a, b) => (checked.has(b.id) - checked.has(a.id)) || rank(a) - rank(b) || a.full_name.localeCompare(b.full_name));
+  return emps.map(e => { const c = cur.get(e.id);
+    return `<label data-dept="${e.department_id??''}" data-s="${esc((e.full_name+' '+(e.emp_code||'')+' '+(e.position||'')).toLowerCase())}"><input type="checkbox" name="emp" value="${e.id}" ${checked.has(e.id)?'checked':''}>${avatar(e,'sm')}<span style="min-width:0;display:flex;justify-content:space-between;gap:8px;align-items:center"><span>${esc(e.full_name)} <span class="p-sub">· ${esc(deptName(e.department_id))}</span></span>${c ? chip(c.status, daysText(c.days)) : chip('none','Бүртгэлгүй')}</span></label>`; }).join('');
+}
+function bkForm(b){
+  const types = sortedTypes(), tid = b.training_type_id ?? types[0]?.id, checked = new Set(b.employee_ids || []);
+  return `<form data-form="booking" style="display:flex;flex-direction:column;gap:12px"><input type="hidden" name="id" value="${b.id||''}">
+    <div class="grid2"><div class="field"><label for="bk-type">Сургалт</label><select class="inp" id="bk-type" name="training_type_id" data-bkt>${types.map(t => `<option value="${t.id}" ${t.id===tid?'selected':''}>${esc(t.name)}</option>`).join('')}</select></div>
+      <div class="field"><label for="bk-st">Төлөв</label><select class="inp" id="bk-st" name="status">${['planned','confirmed'].map(k => `<option value="${k}" ${(b.status||'planned')===k?'selected':''}>${BK_ST[k][0]}</option>`).join('')}</select></div></div>
+    <div class="grid2"><div class="field"><label for="bk-s">Эхлэх огноо</label><input class="inp mono" id="bk-s" type="date" name="start_on" required value="${esc(b.start_on||'')}"></div>
+      <div class="field"><label for="bk-e">Дуусах огноо</label><input class="inp mono" id="bk-e" type="date" name="end_on" value="${esc(b.end_on||'')}"></div></div>
+    <div class="grid2"><div class="field"><label for="bk-loc">Байршил</label><input class="inp" id="bk-loc" name="location" value="${esc(b.location||'')}" placeholder="Сайт, анги, хот"></div>
+      <div class="field"><label for="bk-prov">Сургалт явуулах байгууллага</label><input class="inp" id="bk-prov" name="provider" value="${esc(b.provider||'')}"></div></div>
+    <div class="grid2"><div class="field"><label for="bk-cap">Суудлын тоо</label><input class="inp mono" id="bk-cap" type="number" min="1" name="capacity" value="${esc(b.capacity??'')}"></div>
+      <div class="field"><label for="bk-cost">Нийт зардал (₮)</label><input class="inp mono" id="bk-cost" type="number" min="0" name="cost" value="${esc(b.cost??'')}"></div></div>
+    <div class="field"><label for="bk-notes">Тэмдэглэл</label><textarea class="inp" id="bk-notes" name="notes" style="min-height:50px">${esc(b.notes||'')}</textarea></div>
+    <div class="toolbar"><input class="inp search" id="b-q" type="search" placeholder="Ажилтан хайх" data-bulk="q" aria-label="Ажилтан хайх"><select class="inp" id="b-dept" data-bulk="dept" aria-label="Алба"><option value="">Бүх алба</option>${sortedDepts().map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select>
+      <button class="btn btn-sm" type="button" data-act="bulk-all">Харагдаж буйг сонгох</button></div>
+    <p class="note" style="margin:-4px 0 0">Дууссан, дуусах дөхсөн хүмүүс дээрээ жагсана.</p>
+    <div class="pick-list" id="bk-pick">${bkPick(tid, checked)}</div>
+    <div class="m-foot"><span class="muted" id="b-count" style="margin-right:auto;align-self:center">${checked.size} сонгосон</span><button class="btn" type="button" data-act="close">Болих</button><button class="btn btn-primary" type="submit">Хадгалах</button></div></form>`;
+}
+
 /* --- settings --- */
 function viewSettings(){
   const s = S.settings, pend = pendingReminders();
@@ -1191,7 +1331,7 @@ E001 | Б.Батбаяр | Галын аюулгүй байдал | 2026-03-15  
     ${importsPanel()}
   </div></section>`;
 }
-const VIEWS = { dash:viewDash, org:viewOrg, emps:viewEmps, trs:viewTrs, settings:viewSettings };
+const VIEWS = { dash:viewDash, org:viewOrg, emps:viewEmps, trs:viewTrs, book:viewBook, lic:viewLic, settings:viewSettings };
 
 /* ---------- modals ---------- */
 function openModal({ title, body, wide=false, drawer=false }){
@@ -1726,6 +1866,30 @@ const ACT = {
   'del-admin': async a => { const em = a.dataset.email; if(!await askConfirm(`${em}-ийн админ эрхийг хасах уу? Тэр зөвхөн харах эрхтэй болно.`, 'Хасах')) return;
     await run(async () => { if(!DEMO){ const { error } = await sb.from('app_admins').delete().eq('email', em); if(error) throw error; } S.admins = S.admins.filter(x => x.email !== em); render(); }, 'Эрх хасагдлаа'); },
   'bp-apply': a => applyBulkPhotos(a),
+  'lic-f': a => { S.lf = { q:'', dept:'', type:'', status:a.dataset.st||'' }; render(); },
+  'lic-type': a => { S.lf ||= { q:'', dept:'', type:'', status:'' }; S.lf.type = String(S.lf.type) === a.dataset.id ? '' : a.dataset.id; render(); },
+  'lic-types': () => openModal({ title:'Үнэмлэхийн төрөл сонгох', wide:true, body:`<form data-form="lic-types" style="display:flex;flex-direction:column;gap:10px"><p class="note" style="margin:0">Аль сургалт нь Монгол улсын эрхийн үнэмлэх болохыг чагтална.</p>
+      <div class="pick-list">${sortedTypes().map(t => `<label style="grid-template-columns:auto minmax(0,1fr)"><input type="checkbox" name="lic" value="${t.id}" ${isLic(t)?'checked':''}><span>${esc(t.name)}</span></label>`).join('')}</div>
+      ${S.hasLicFlag ? '' : '<p class="note" style="color:var(--bad)">Хадгалахын тулд шинэ setup.sql-ийг Supabase дээр ажиллуулна уу.</p>'}
+      <div class="m-foot"><button class="btn" type="button" data-act="close">Болих</button><button class="btn btn-primary" type="submit">Хадгалах</button></div></form>` }),
+  'lic-export': () => { const head = ['Код','Овог нэр','Алба','Албан тушаал','Утас','Үнэмлэх','Дугаар','Олгосон','Дуусах','Үлдсэн хоног','Төлөв'];
+    const rows = filteredLic().map(c => { const e = IDX.emp.get(c.employee_id); return [e.emp_code, e.full_name, deptName(e.department_id), e.position, e.phone, typeName(c.training_type_id), c.certificate_no, c.completed_on, c.expires_on, c.days, ST[c.status]]; });
+    const csv = [head, ...rows].map(r => r.map(csvCell).join(',')).join('\n');
+    openModal({ title:'Үнэмлэх CSV', wide:true, body:`<textarea class="inp mono" id="exp-csv" style="min-height:260px;font-size:12px" readonly>${esc(csv)}</textarea><div class="m-foot"><button class="btn" data-act="copy-csv">Хуулах</button><button class="btn btn-primary" data-act="dl-csv">Татах (.csv)</button></div>` }); },
+  'bk-new': a => { S.openEmp = null; const tid = a.dataset.type ? Number(a.dataset.type) : undefined; const due = tid ? (dueList().find(g => g.tid === tid)?.ids || []) : [];
+    openModal({ title:'Шинэ сургалт захиалга', wide:true, body:bkForm({ training_type_id:tid, employee_ids:due }) }); },
+  'bk-edit': a => { const b = S.books.find(x => x.id === Number(a.dataset.id)); if(b) openModal({ title:'Захиалга засах', wide:true, body:bkForm(b) }); },
+  'bk-view': a => { const b = S.books.find(x => x.id === Number(a.dataset.id)); if(!b) return; openModal({ title:b.title || typeName(b.training_type_id), body:`<p class="note" style="margin:0">${fmtDate(b.start_on)} · ${(b.employee_ids||[]).length} оролцогч</p><div>${(b.employee_ids||[]).map(id => IDX.emp.get(id)).filter(Boolean).map(e => `<button class="prow" data-act="profile" data-id="${e.id}">${avatar(e,'sm')}<span><span class="p-name">${esc(e.full_name)}</span><br><span class="p-sub">${esc(deptName(e.department_id))} · ${esc(e.position||'')}</span></span><span></span></button>`).join('')}</div>` }); },
+  'bk-st': async a => { const id = Number(a.dataset.id), st = a.dataset.st; if(st === 'cancelled' && !await askConfirm('Энэ захиалгыг цуцлах уу?', 'Цуцлах')) return;
+    await run(() => dbUpdate('training_bookings', id, { status:st }), st === 'cancelled' ? 'Цуцлагдлаа' : 'Баталгаажлаа'); render(); },
+  'bk-del': async a => { if(!await askConfirm('Энэ захиалгыг бүрмөсөн устгах уу? (Үүсгэсэн сургалтын бичлэгүүд хэвээр үлдэнэ.)')) return; await run(() => dbDelete('training_bookings', Number(a.dataset.id)), 'Устгагдлаа'); render(); },
+  'bk-done': a => { const b = S.books.find(x => x.id === Number(a.dataset.id)); if(!b) return; const t = IDX.type.get(b.training_type_id); const d = b.end_on || b.start_on || todayStr();
+    if(!t) return toast('Сургалтын төрөл олдсонгүй','bad');
+    openModal({ title:'Сургалт явагдсан', body:`<form data-form="bk-done" style="display:flex;flex-direction:column;gap:12px"><input type="hidden" name="id" value="${b.id}">
+      <p class="note" style="margin:0">Хамрагдсан хүмүүсийг чагтална. Тэдэнд <b>${esc(t.name)}</b> сургалтын бичлэг үүсч, дуусах огноо нь ${t.validity_months} сараар бодогдоно.</p>
+      <div class="field"><label for="bd-d">Хамрагдсан огноо</label><input class="inp mono" id="bd-d" type="date" name="completed_on" required value="${d}"></div>
+      <div class="pick-list">${(b.employee_ids||[]).map(id => IDX.emp.get(id)).filter(Boolean).map(e => `<label><input type="checkbox" name="emp" value="${e.id}" checked>${avatar(e,'sm')}<span>${esc(e.full_name)} <span class="p-sub">· ${esc(deptName(e.department_id))}</span></span></label>`).join('')}</div>
+      <div class="m-foot"><button class="btn" type="button" data-act="close">Болих</button><button class="btn btn-primary" type="submit">Бүртгэх</button></div></form>` }); },
   'org-edit': a => { const n = S.nodes.find(x => x.id === Number(a.dataset.id)); if(n) openModal({ title:'Хайрцаг засах', body:orgEditForm(n) }); },
   'org-add': async a => { const pid = Number(a.dataset.parent), p = S.nodes.find(n => n.id === pid); if(!p) return;
     const n = await run(() => dbInsert('org_nodes', { department_id:p.department_id, parent_id:pid, title:null, sort:nextSort(p.department_id, pid) })); if(n){ closeModal(); render(); openModal({ title:'Шинэ хайрцаг', body:orgEditForm(n) }); } },
@@ -1755,7 +1919,7 @@ const ACT = {
     Object.assign(S, { ready:false, auth:'login', user:null, admin:false, admins:[], imports:[], depts:[], emps:[], trs:[], types:[], logs:[], view:'dash', org:null });
     closeModal(); document.body.classList.remove('ro'); render(); toast('Системээс гарлаа'); }
 };
-const ADMIN_ACTS = new Set(['bp-apply','undo-imp','wipe-all','new-emp','edit-emp','del-emp','new-tr','edit-tr','renew','del-tr','bulk','bulk-all','send-now','del-dept','del-type','pick-photo','imp-apply','del-admin']);
+const ADMIN_ACTS = new Set(['lic-types','bk-new','bk-edit','bk-st','bk-del','bk-done','bp-apply','undo-imp','wipe-all','new-emp','edit-emp','del-emp','new-tr','edit-tr','renew','del-tr','bulk','bulk-all','send-now','del-dept','del-type','pick-photo','imp-apply','del-admin']);
 const denied = () => { toast('Танд засах эрх алга. Админтай холбогдоно уу.','bad'); };
 document.addEventListener('click', ev => { const a = ev.target.closest('[data-act]'); if(!a) return; if(!S.admin && ADMIN_ACTS.has(a.dataset.act)){ ev.preventDefault(); return denied(); } const f = ACT[a.dataset.act]; if(f){ if(a.tagName === 'A') ev.preventDefault(); f(a, ev); } });
 document.addEventListener('keydown', ev => {
@@ -1772,7 +1936,8 @@ document.addEventListener('drop', ev => { const z = ev.target.closest?.('[data-d
 function updBulkCount(){ const n = $$('.pick-list input:checked').length; const c = $('#b-count'); if(c) c.textContent = `${n} сонгосон`; }
 document.addEventListener('input', ev => {
   const t = ev.target;
-  if(t.dataset.filter){ const o = S[t.dataset.filter]; o[t.dataset.key] = t.type === 'checkbox' ? t.checked : t.value; $('#list').innerHTML = t.dataset.filter === 'ef' ? listEmps() : listTrs(); }
+  if(t.dataset.filter){ const o = S[t.dataset.filter]; o[t.dataset.key] = t.type === 'checkbox' ? t.checked : t.value; $('#list').innerHTML = t.dataset.filter === 'ef' ? listEmps() : t.dataset.filter === 'lf' ? listLic() : listTrs(); }
+  if('bkt' in t.dataset){ const ch = new Set($$('#bk-pick input:checked').map(i => Number(i.value))); $('#bk-pick').innerHTML = bkPick(Number(t.value), ch); const q = $('#b-q'); if(q) q.dispatchEvent(new Event('input', { bubbles:true })); }
   if(t.dataset.bulk){ const q = $('#b-q').value.trim().toLowerCase(), d = $('#b-dept').value; $$('.pick-list label').forEach(l => l.hidden = (d && l.dataset.dept !== d) || (q && !l.dataset.s.includes(q))); }
   const form = t.form;
   if(form && (form.dataset.form === 'training' || form.dataset.form === 'bulk') && (t.name === 'training_type_id' || t.name === 'completed_on') && form.completed_on.value){
@@ -1838,6 +2003,22 @@ const FORMS = {
   'org-node': async f => { const id = Number(f.id.value);
     const r = await run(async () => { await dbUpdate('org_nodes', id, { title:f.title.value.trim() || null }); await orgAssign(id, num(f.employee_id.value), false); return true; }, 'Хадгалагдлаа');
     if(r){ closeModal(); render(); } },
+  booking: async f => {
+    const id = num(f.id.value), ids = $$('input[name=emp]:checked', f).map(i => Number(i.value));
+    if(f.end_on.value && f.end_on.value < f.start_on.value) return toast('Дуусах огноо эхлэхээс өмнө байна','bad');
+    const row = { training_type_id:Number(f.training_type_id.value), status:f.status.value, start_on:f.start_on.value || null, end_on:f.end_on.value || null, location:f.location.value.trim() || null,
+      provider:f.provider.value.trim() || null, capacity:num(f.capacity.value), cost:num(f.cost.value), notes:f.notes.value.trim() || null, employee_ids:ids };
+    if(row.capacity && ids.length > row.capacity && !await askConfirm(`Суудал ${row.capacity}, сонгосон ${ids.length} хүн байна. Үргэлжлүүлэх үү?`, 'Тийм')) return;
+    if(!id) row.created_by = S.user?.email || null;
+    const r = await run(() => id ? dbUpdate('training_bookings', id, row) : dbInsert('training_bookings', row), 'Захиалга хадгалагдлаа'); if(r){ closeModal(); render(); } },
+  'bk-done': async f => {
+    const b = S.books.find(x => x.id === Number(f.id.value)), t = IDX.type.get(b.training_type_id), d = f.completed_on.value, ids = $$('input[name=emp]:checked', f).map(i => Number(i.value));
+    const r = await run(async () => { if(ids.length) await dbInsert('trainings', ids.map(e => ({ employee_id:e, training_type_id:t.id, completed_on:d, expires_on:addMonths(d, t.validity_months), provider:b.provider || null, notes:`Захиалга #${b.id}` })));
+      await dbUpdate('training_bookings', b.id, { status:'done', employee_ids:ids, end_on:b.end_on || d }); return true; }, `${ids.length} ажилтанд сургалт бүртгэгдлээ`);
+    if(r){ closeModal(); render(); } },
+  'lic-types': async f => { if(!S.hasLicFlag) return toast('Эхлээд setup.sql-ийг Supabase дээр ажиллуулна уу','bad');
+    const on = new Set($$('input[name=lic]:checked', f).map(i => Number(i.value)));
+    const r = await run(async () => { for(const t of S.types){ const v = on.has(t.id); if(isLic(t) !== v || t.is_license == null) await dbUpdate('training_types', t.id, { is_license:v }); } return true; }, 'Хадгалагдлаа'); if(r){ closeModal(); render(); } },
   'add-admin': async f => { const em = f.email.value.trim().toLowerCase(); if(S.admins.some(a => a.email === em)) return toast('Аль хэдийн админ байна','bad');
     await run(async () => { let row = { email:em }; if(!DEMO){ const { data, error } = await sb.from('app_admins').insert(row).select().single(); if(error) throw error; row = data; } S.admins.push(row); render(); }, 'Админ нэмэгдлээ'); },
   'add-type': async f => { const n = f.name.value.trim(), m = Number(f.months.value)||12; await run(async () => { await dbInsert('training_types', { name:n, validity_months:m }); render(); }, 'Сургалт нэмэгдлээ'); }
