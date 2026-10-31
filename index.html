@@ -176,6 +176,12 @@ textarea.inp{resize:vertical;min-height:70px}
 .chip-acc{background:var(--accent-soft);color:var(--accent)}
 .bk-list{display:flex;flex-direction:column;gap:10px}
 .bk-days{display:flex;flex-direction:column;gap:14px}
+#bk-body{display:flex;flex-direction:column;gap:12px}
+.due-g summary{list-style:none} .due-g summary::-webkit-details-marker{display:none}
+.due-g summary h2::before{content:"▸ ";color:var(--faint)} .due-g[open] summary h2::before{content:"▾ "}
+.due-g .bk-ppl{grid-template-columns:repeat(auto-fill,minmax(290px,1fr))}
+.due-g .bk-p .chip{margin-left:auto;flex:none}
+.badge-n{display:inline-block;margin-left:4px;background:var(--bad);color:#fff;border-radius:9px;padding:0 6px;font-size:11px;line-height:17px}
 .bk-day.past{opacity:.82} .bk-day.today{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .bk-dh{display:flex;gap:12px;align-items:center}
 .bk-dh .bk-date{width:52px;padding:5px 0;grid-row:auto}
@@ -1242,12 +1248,13 @@ function viewBook(){
   const tile = (cls, lbl, val, sub) => `<div class="tile ${cls}" style="cursor:default"><span class="t-lbl">${lbl}</span><span class="t-num">${val}</span><span class="t-sub">${sub}</span></div>`;
   const tab = (k, l) => `<button class="btn btn-sm ${v.view === k ? 'btn-primary' : ''}" data-act="bk-view" data-v="${k}">${l}</button>`;
   const deptsIn = [...new Set(S.bitems.filter(b => !v.month || b.month === v.month).map(biDept))].sort();
+  const due = dueList();
   let body = '';
-  if(!S.bitems.length) body = `<div class="panel panel-body" style="display:flex;flex-direction:column;gap:10px;align-items:flex-start"><p class="note">Захиалгын бүртгэл алга. <b>Захиалгын Excel</b>-ээ (booking track) оруулна уу. Сарын sheet (November гэх мэт) автоматаар сонгогдоно.</p>${S.admin ? bookImportBtn('Захиалгын Excel оруулах', 'btn btn-primary') : ''}</div>`;
+  if(v.view === 'due') body = bkDueView(due);
+  else if(!S.bitems.length) body = `<div class="panel panel-body" style="display:flex;flex-direction:column;gap:10px;align-items:flex-start"><p class="note">Захиалгын бүртгэл алга. <b>Захиалгын Excel</b>-ээ (booking track) оруулна уу. Сарын sheet (November гэх мэт) автоматаар сонгогдоно.</p>${S.admin ? bookImportBtn('Захиалгын Excel оруулах', 'btn btn-primary') : ''}</div>`;
   else if(v.view === 'dept') body = bkDeptView(all);
   else if(v.view === 'type') body = bkTypeView(all);
   else body = bkDayView(all);
-  const due = dueList();
   return `<div class="page-head"><div><h1>Сургалт захиалгын мэдээлэл</h1><p>${v.month ? monLabel(v.month) : 'Бүх сар'} · ${all.length} захиалга, ${ppl} ажилтан, ${days} өдөр</p></div>
     <div class="actions">${S.admin ? `${bookImportBtn()}<button class="btn btn-primary" data-act="bk-new">+ Захиалга нэмэх</button>` : ''}</div></div>
   ${S.settings.last_book ? `<p class="last-imp" style="margin:-8px 0 0">Сүүлд шинэчилсэн: ${fmtDate(String(S.settings.last_book.at).slice(0,10))} · ${esc(S.settings.last_book.file)} · ${esc(S.settings.last_book.sheets)}</p>` : ''}
@@ -1262,12 +1269,24 @@ function viewBook(){
     <select class="inp" data-bv="dept" aria-label="Алба"><option value="">Бүх алба</option>${deptsIn.map(d => `<option ${v.dept === d ? 'selected' : ''}>${esc(d)}</option>`).join('')}</select>
     <select class="inp" data-bv="status" aria-label="Төлөв"><option value="">Бүх төлөв</option>${Object.entries(BK).map(([k, [l]]) => `<option value="${k}" ${v.status === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
     <input class="inp search" type="search" data-bv="q" value="${esc(v.q)}" placeholder="Нэр, САП, сургалт, байршил" aria-label="Хайх">
-    <span style="display:flex;gap:6px">${tab('day','Өдрөөр')}${tab('dept','Албаар')}${tab('type','Сургалтаар')}</span>
+    <span style="display:flex;gap:6px;flex-wrap:wrap">${tab('day','Өдрөөр')}${tab('dept','Албаар')}${tab('type','Сургалтаар')}<button class="btn btn-sm ${v.view === 'due' ? 'btn-primary' : ''}" data-act="bk-view" data-v="due">Захиалга хэрэгтэй <span class="badge-n">${due.reduce((s, g) => s + g.ids.length, 0)}</span></button></span>
   </div>
   <div id="bk-body">${body}</div>
-  ${due.length ? `<section class="panel"><div class="panel-head"><h2>Захиалга хэрэгтэй сургалт</h2><span class="note">60 хоногт дуусах / дууссан, захиалгад ороогүй</span></div>
-    <div class="panel-body" style="padding-block:4px">${due.slice(0, 10).map(g => `<div class="due-row"><span style="min-width:0"><b style="font-weight:500">${esc(typeName(g.tid))}</b><br><span class="p-sub">${g.bad ? `<span style="color:var(--bad)">${g.bad} дууссан</span>` : ''}${g.bad && g.warn ? ' · ' : ''}${g.warn ? `<span style="color:var(--warn)">${g.warn} дуусах дөхсөн</span>` : ''}</span></span>
-      <span class="chip chip-plain">${g.ids.length} хүн</span>${S.admin ? `<button class="btn btn-sm" data-act="bk-new" data-type="${g.tid}">Захиалах</button>` : '<span></span>'}</div>`).join('')}</div></section>` : ''}`;
+`;
+}
+function bkDueView(due){
+  const v = S.bv, q = v.q.trim().toLowerCase();
+  const cur = new Map(activeCurrent().map(c => [c.training_type_id + ':' + c.employee_id, c]));
+  const groups = due.map(g => ({ ...g, ppl:g.ids.map(id => IDX.emp.get(id)).filter(e => e && (!v.dept || deptName(e.department_id) === v.dept) && (!q || (e.full_name + ' ' + (e.emp_code||'') + ' ' + typeName(g.tid)).toLowerCase().includes(q)))
+    .sort((a, b) => cur.get(g.tid + ':' + a.id).days - cur.get(g.tid + ':' + b.id).days) })).filter(g => g.ppl.length);
+  if(!groups.length) return '<div class="panel empty">Захиалга хэрэгтэй хүн алга. Бүгд хамрагдсан эсвэл захиалгад орсон байна.</div>';
+  const total = groups.reduce((s, g) => s + g.ppl.length, 0);
+  return `<p class="note" style="margin:0">Хугацаа нь дууссан эсвэл 60 хоногт дуусах, захиалгад ороогүй <b>${total}</b> тохиолдол · ${groups.length} сургалт</p>
+  ${groups.map(g => { const bad = g.ppl.filter(e => cur.get(g.tid + ':' + e.id).days < 0).length, warn = g.ppl.length - bad;
+    return `<section class="panel"><details class="due-g"><summary class="panel-head" style="cursor:pointer;border-bottom:0"><span style="min-width:0"><h2>${esc(typeName(g.tid))}</h2><span class="p-sub">${bad ? `<span style="color:var(--bad)">${bad} дууссан</span>` : ''}${bad && warn ? ' · ' : ''}${warn ? `<span style="color:var(--warn)">${warn} дуусах дөхсөн</span>` : ''}</span></span>
+      <span class="chips-row" style="align-items:center">${deptChips(g.ppl.map(e => ({ employee_id:e.id })))}<span class="chip chip-acc">${g.ppl.length} хүн</span>${S.admin ? `<button class="btn btn-sm btn-primary" data-act="bk-new" data-type="${g.tid}" data-ids="${g.ppl.map(e => e.id).join(',')}">Захиалах</button>` : ''}</span></summary>
+      <div class="panel-body" style="border-top:1px solid var(--line-2)"><div class="bk-ppl">${g.ppl.map(e => { const c = cur.get(g.tid + ':' + e.id);
+        return `<span class="bk-p" data-act="profile" data-id="${e.id}" title="${esc(e.position||'')}">${avatar(e,'sm')}<span class="bk-pn"><b>${esc(e.full_name)}</b><small>${esc(deptName(e.department_id))} · ${esc(e.position||'')}</small></span>${chip(c.status, c.days < 0 ? `${-c.days} хоног хэтэрсэн` : `${c.days} хоног`)}</span>`; }).join('')}</div></div></details></section>`; }).join('')}`;
 }
 const bookImportBtn = (label = 'Захиалгын Excel', cls = 'btn') => `<label class="${cls}" style="cursor:pointer">${label}<input type="file" accept=".xlsx,.xls,.xlsm" data-bookimport hidden></label>`;
 const timeSpan = b => b.start_time ? `${b.start_time}${b.end_time ? '–' + b.end_time : ''}` : '';
@@ -2054,7 +2073,7 @@ const ACT = {
     const rows = filteredLic().map(c => { const e = IDX.emp.get(c.employee_id); return [e.emp_code, e.full_name, deptName(e.department_id), e.position, e.phone, typeName(c.training_type_id), c.certificate_no, c.completed_on, c.expires_on, c.days, ST[c.status]]; });
     const csv = [head, ...rows].map(r => r.map(csvCell).join(',')).join('\n');
     openModal({ title:'Үнэмлэх CSV', wide:true, body:`<textarea class="inp mono" id="exp-csv" style="min-height:260px;font-size:12px" readonly>${esc(csv)}</textarea><div class="m-foot"><button class="btn" data-act="copy-csv">Хуулах</button><button class="btn btn-primary" data-act="dl-csv">Татах (.csv)</button></div>` }); },
-  'bk-new': a => { S.openEmp = null; const tid = a.dataset.type ? Number(a.dataset.type) : undefined; const due = tid ? (dueList().find(g => g.tid === tid)?.ids || []) : [];
+  'bk-new': (a, ev) => { ev?.preventDefault(); S.openEmp = null; const tid = a.dataset.type ? Number(a.dataset.type) : undefined; const due = a.dataset.ids ? a.dataset.ids.split(',').map(Number) : tid ? (dueList().find(g => g.tid === tid)?.ids || []) : [];
     openModal({ title:'Сургалт захиалах', wide:true, body:bkForm(tid, due) }); },
   'bk-view': a => { S.bv.view = a.dataset.v; render(); },
   'bk-dept': a => { S.bv.dept = a.dataset.d; render(); },
@@ -2123,7 +2142,7 @@ function updBulkCount(){ const n = $$('.pick-list input:checked').length; const 
 document.addEventListener('input', ev => {
   const t = ev.target;
   if(t.dataset.filter){ const o = S[t.dataset.filter]; o[t.dataset.key] = t.type === 'checkbox' ? t.checked : t.value; $('#list').innerHTML = t.dataset.filter === 'ef' ? listEmps() : t.dataset.filter === 'lf' ? listLic() : listTrs(); }
-  if(t.dataset.bv !== undefined && S.bv){ S.bv[t.dataset.bv] = t.value; if(t.dataset.bv === 'q'){ $('#bk-body').innerHTML = S.bv.view === 'dept' ? bkDeptView(bkFiltered()) : S.bv.view === 'type' ? bkTypeView(bkFiltered()) : bkDayView(bkFiltered()); } else render(); }
+  if(t.dataset.bv !== undefined && S.bv){ S.bv[t.dataset.bv] = t.value; if(t.dataset.bv === 'q'){ $('#bk-body').innerHTML = S.bv.view === 'due' ? bkDueView(dueList()) : S.bv.view === 'dept' ? bkDeptView(bkFiltered()) : S.bv.view === 'type' ? bkTypeView(bkFiltered()) : bkDayView(bkFiltered()); } else render(); }
   if('bkt' in t.dataset){ const ch = new Set($$('#bk-pick input:checked').map(i => Number(i.value))); $('#bk-pick').innerHTML = bkPick(Number(t.value), ch); const q = $('#b-q'); if(q) q.dispatchEvent(new Event('input', { bubbles:true })); }
   if(t.dataset.bulk){ const q = $('#b-q').value.trim().toLowerCase(), d = $('#b-dept').value; $$('.pick-list label').forEach(l => l.hidden = (d && l.dataset.dept !== d) || (q && !l.dataset.s.includes(q))); }
   const form = t.form;
