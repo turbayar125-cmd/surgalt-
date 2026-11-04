@@ -360,6 +360,18 @@ pre.code{background:var(--surface-2);border-radius:7px;padding:10px 12px;font-fa
 .note{font-size:12.5px;color:var(--muted);margin:0}
 
 /* teams (Алба) */
+.dept-hero{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:26px 28px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:18px;box-shadow:var(--shadow);transition:border-color .15s,transform .15s}
+.dept-hero:hover{border-color:var(--accent);transform:translateY(-1px)}
+.hero-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.hero-name{font-size:40px;font-weight:800;letter-spacing:-.02em;line-height:1}
+.hero-bar .bar{height:14px;border-radius:7px}
+.hero-stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.hero-stat{background:var(--surface-2);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.hero-stat b{font-size:26px;font-variant-numeric:tabular-nums;line-height:1.1}
+.hero-stat span{font-size:12.5px;color:var(--muted)}
+.hero-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.hero-foot .faces .av{margin-left:-10px;border:2px solid var(--surface)} .hero-foot .faces .av:first-child{margin-left:0}
+@media (max-width:760px){.hero-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.hero-name{font-size:30px}.dept-hero{padding:18px}}
 .tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
 .tcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:12px;min-width:0}
 .tcard:hover{border-color:var(--accent)}
@@ -497,7 +509,7 @@ const CONFIG = {
 const DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
 const sb = (!DEMO && window.supabase) ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY) : null;
 
-const APP_VER = '2026.11.05h';
+const APP_VER = '2026.11.05i';
 const TABLES = { news_posts:'news', booking_items:'bitems', training_bookings:'books', departments:'depts', employees:'emps', training_types:'types', trainings:'trs', reminder_log:'logs', org_nodes:'nodes' };
 const S = {
   ready:false, auth:null, user:null, view:'dash',
@@ -1023,8 +1035,8 @@ function orgChart(deptId, edit){
 }
 
 function viewOrg(){
-  if(S.myDept && IDX.dept.has(S.myDept)) return viewTeam(S.myDept);
   if(S.org && IDX.dept.has(S.org)) return viewTeam(S.org);
+  if(S.myDept && IDX.dept.has(S.myDept)) return deptHero(S.myDept);
   const noDept = S.emps.filter(e => e.active && !IDX.dept.has(e.department_id)).length;
   const cards = sortedDepts().map(d => {
     const members = S.emps.filter(e => e.active && e.department_id === d.id), st = teamStats(members);
@@ -1046,13 +1058,28 @@ function viewOrg(){
   ${noDept ? `<p class="note">${noDept} ажилтан албанд хуваарилагдаагүй байна. <button class="btn-link" data-act="goto-emps" data-dept="">Ажилтнууд руу</button></p>` : ''}`;
 }
 
+// Албаны данс: өөрийн алба том, урт карт хэлбэрээр; дарахад бүтэц нээгдэнэ
+function deptHero(id){
+  const d = IDX.dept.get(id), members = S.emps.filter(e => e.active && e.department_id === id), st = teamStats(members);
+  const root = (kidsMap(id).get(0) || []).find(n => n.employee_id), t = teamTree(id), mh = t.roots[0] && (t.size.get(t.roots[0].id)||1) > 1 ? t.roots[0] : null;
+  const head = root ? IDX.emp.get(root.employee_id) : mh, none = members.filter(e => !(IDX.byEmp.get(e.id)||[]).length).length;
+  const stat = (v, l, c) => `<div class="hero-stat"><b style="color:${c}">${v}</b><span>${l}</span></div>`;
+  return `<div class="page-head"><div><h1>Алба</h1><p>Алба дээр дарж бүтцийг нь харна</p></div></div>
+  <button class="dept-hero" data-act="goto-org" data-dept="${id}">
+    <span class="hero-top"><span class="hero-name">${esc(d.name)}</span><span class="chip chip-plain" style="font-size:14px;padding:4px 12px">${members.length} хүн</span></span>
+    ${head ? `<span class="tcard-head">${avatar(head,'lg')}<span style="min-width:0"><span class="p-name" style="font-size:17px">${esc(head.full_name)}</span><span class="p-sub" style="font-size:14px">${esc(root?.title || head.position || 'Удирдлага')}</span></span></span>` : '<span class="note">Удирдлага тодорхойлоогүй</span>'}
+    <span class="hero-bar">${statusBar(st)}</span>
+    <span class="hero-stats">${stat(st.pct + '%', 'Хүчинтэй', 'var(--fg)')}${stat(st.c.ok, 'Хүчинтэй сургалт', 'var(--ok)')}${stat(st.c.warn, warnDays() + ' хоногт дуусах', 'var(--warn)')}${stat(st.c.bad, 'Хугацаа дууссан', 'var(--bad)')}${stat(none, 'Сургалтгүй', 'var(--muted)')}</span>
+    <span class="hero-foot"><span class="faces">${members.filter(e => e !== head).slice(0, 18).map(e => avatar(e,'md')).join('')}${members.length > 19 ? `<span class="av av-md av-ini" style="--h:220">+${members.length - 19}</span>` : ''}</span><span class="btn btn-primary">Бүтэц харах →</span></span>
+  </button>`;
+}
 function viewTeam(deptId){
   const d = IDX.dept.get(deptId), edit = canOrg();
   const members = S.emps.filter(e => e.active && e.department_id === deptId), st = teamStats(members);
   const placed = placedIds(), pool = members.filter(e => !placed.has(e.id)).sort((a, b) => (a.position||'').localeCompare(b.position||'') || a.full_name.localeCompare(b.full_name));
   const has = deptNodes(deptId).length, tpl = tplFor(d);
   const tile = (cls, lbl, val, sub, stv) => `<button class="tile ${cls}" data-act="goto-trs" data-st="${stv}" data-dept="${deptId}"><span class="t-lbl">${lbl}</span><span class="t-num">${val}</span><span class="t-sub">${sub}</span></button>`;
-  return `<div class="page-head"><div class="org-head">${S.myDept ? '' : `<button class="btn btn-sm" data-act="org-back">${I.back}Бүх алба</button>`}<div><h1>${esc(d.name)}</h1><p>${members.length} идэвхтэй ажилтан · ${members.length - pool.length} нь бүтцэд байрласан</p></div></div>
+  return `<div class="page-head"><div class="org-head"><button class="btn btn-sm" data-act="org-back">${I.back}${S.myDept ? 'Буцах' : 'Бүх алба'}</button><div><h1>${esc(d.name)}</h1><p>${members.length} идэвхтэй ажилтан · ${members.length - pool.length} нь бүтцэд байрласан</p></div></div>
     <div class="actions"><button class="btn" data-act="goto-emps" data-dept="${deptId}">Жагсаалтаар харах</button>${S.admin ? `<button class="btn btn-primary" data-act="new-emp" data-dept="${deptId}">+ Ажилтан нэмэх</button>` : ''}</div></div>
   <div class="tiles">
     ${tile('ok','Хүчинтэй сургалт', st.c.ok, `Нийт ${st.tot}-аас ${st.pct}%`, 'ok')}
