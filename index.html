@@ -346,6 +346,9 @@ details.hist summary{cursor:pointer;color:var(--muted);font-size:13px}
 .pick-list label:hover{background:var(--surface-2)}
 
 .set-row{display:grid;grid-template-columns:minmax(0,1fr) 110px auto;gap:8px;align-items:center;padding:6px 0}
+.set-row.type-row{grid-template-columns:minmax(0,1.3fr) 80px minmax(0,1fr) auto}
+.type-x{grid-column:1/-1;margin:-2px 0 4px;font-size:12px}
+@media (max-width:640px){.set-row.type-row{grid-template-columns:1fr 80px}.set-row.type-row>*:nth-child(n+3){grid-column:1/-1}}
 .set-row.two{grid-template-columns:minmax(0,1fr) auto}
 .days-chips{display:flex;gap:6px;flex-wrap:wrap}
 pre.code{background:var(--surface-2);border-radius:7px;padding:10px 12px;font-family:var(--f-mono);font-size:12px;overflow-x:auto;margin:0;white-space:pre}
@@ -494,7 +497,7 @@ const CONFIG = {
 const DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
 const sb = (!DEMO && window.supabase) ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY) : null;
 
-const APP_VER = '2026.11.05f';
+const APP_VER = '2026.11.05g';
 const TABLES = { news_posts:'news', booking_items:'bitems', training_bookings:'books', departments:'depts', employees:'emps', training_types:'types', trainings:'trs', reminder_log:'logs', org_nodes:'nodes' };
 const S = {
   ready:false, auth:null, user:null, view:'dash',
@@ -531,6 +534,9 @@ function errMsg(e){ const m = e?.message || String(e); if(e?.code==='23505') ret
 async function run(fn, okMsg){ try{ const r = await fn(); if(okMsg) toast(typeof okMsg==='function'?okMsg(r):okMsg); return r; } catch(e){ console.error(e); toast(errMsg(e),'bad'); } }
 
 /* ---------- status ---------- */
+// Сургалт зөвхөн тодорхой албан тушаалд хамаардаг эсэх (training_types.only_positions)
+const posList = t => String(t?.only_positions || '').split(',').map(x => normKey(x)).filter(Boolean);
+const typeAllowed = (t, e) => { const l = posList(t); if(!l.length) return true; const p = normKey(e?.position || ''); return !!p && l.some(x => p === x || p.includes(x)); };
 const hideLimit = () => { const v = S.settings.hide_expired_days; return v == null || v === '' ? 500 : Number(v); };
 const warnDays = () => { const d = S.settings.reminder_days || []; return d.length ? Math.max(...d) : 30; };
 const statusOf = d => d < 0 ? 'bad' : d <= warnDays() ? 'warn' : 'ok';
@@ -551,7 +557,7 @@ function reindex(){
   // Хэт удаан хэтэрсэн (жишээ нь 500+ хоног) бичлэгийг идэвхгүй гэж үзэж тооцоололд оруулахгүй; профайлын "Өмнөх бичлэг"-д үлдэнэ
   const lim = hideLimit(); IDX.hidden = 0;
   IDX.current = [...cur.values()].filter(t => IDX.emp.has(t.employee_id) && IDX.type.has(t.training_type_id)).map(t => ({ ...t, days:daysUntil(t.expires_on) }))
-    .filter(t => { if(lim > 0 && t.days < -lim){ IDX.hidden++; return false; } return true; })
+    .filter(t => { if(lim > 0 && t.days < -lim){ IDX.hidden++; return false; } return typeAllowed(IDX.type.get(t.training_type_id), IDX.emp.get(t.employee_id)); })
     .map(t => { IDX.currentIds.add(t.id); return { ...t, status: statusOf(t.days) }; });
   IDX.byEmp = new Map();
   for(const c of IDX.current){ if(!IDX.byEmp.has(c.employee_id)) IDX.byEmp.set(c.employee_id, []); IDX.byEmp.get(c.employee_id).push(c); }
@@ -690,7 +696,7 @@ async function fetchAll(table){
   return out;
 }
 async function loadAll(){
-  if(DEMO){ S.extra = true; seedDemo(); S.imports = []; S.nodes = []; S.books = []; S.bitems = []; S.biMark = true; S.licLog = []; S.hasProof = true; S.hasBook = true; S.news = []; S.hasNews = true; S.hasLicFlag = true; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
+  if(DEMO){ S.extra = true; seedDemo(); S.imports = []; S.nodes = []; S.books = []; S.bitems = []; S.biMark = true; S.licLog = []; S.hasProof = true; S.hasPosRule = true; S.hasBook = true; S.news = []; S.hasNews = true; S.hasLicFlag = true; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
   const [d,e,t,tr] = await Promise.all(['departments','employees','training_types','trainings'].map(fetchAll));
   const l = await sb.from('reminder_log').select('*').order('sent_at',{ascending:false}).limit(2000);
   const s = await sb.from('settings').select('*').eq('id',1).maybeSingle();
@@ -713,6 +719,7 @@ async function loadAll(){
   S.books = [];
   { const t = await sb.from('training_types').select('is_license').limit(1); S.hasLicFlag = !t.error; }
   { const t = await sb.from('trainings').select('proof_url').limit(1); S.hasProof = !t.error; }
+  S.hasPosRule = S.types.length ? 'only_positions' in S.types[0] : !(await sb.from('training_types').select('only_positions').limit(1)).error;
   try{ S.nodes = await fetchAll('org_nodes'); } catch(e){ console.warn('org_nodes:', e.message); S.nodes = []; }
   { const l = await sb.from('license_mail_log').select('*').order('sent_at', { ascending:false }).limit(20); S.licLog = l.error ? null : l.data; }
   const il = await sb.from('import_log').select('id,at,file,by_email,summary,data,undone_at').order('at', { ascending:false }).limit(15);
@@ -1635,7 +1642,10 @@ function viewSettings(){
       <form data-form="add-dept" class="set-row two" style="margin-top:6px"><input class="inp" id="nd-name" name="name" placeholder="Шинэ алба" required><button class="btn btn-sm" type="submit">Нэмэх</button></form>
     </div></section>
     <section class="panel"><div class="panel-head"><h2>Сургалтын төрөл</h2><span class="note">Хүчинтэй хугацаа, сараар</span></div><div class="panel-body">
-      ${sortedTypes().map(t => `<div class="set-row"><input class="inp" id="tn-${t.id}" value="${esc(t.name)}" data-edit="type-name" data-id="${t.id}" aria-label="Сургалтын нэр"><input class="inp mono" id="tm-${t.id}" type="number" min="1" value="${t.validity_months}" data-edit="type-months" data-id="${t.id}" aria-label="Сар"><button class="btn btn-sm btn-danger" data-act="del-type" data-id="${t.id}">Устгах</button></div>`).join('')}
+      ${S.hasPosRule ? '<p class="note" style="margin:0 0 6px">3-р талбар: зөвхөн эдгээр албан тушаалд хамаарна (таслалаар, жишээ нь <i>Electrician, Electrical Engineer</i>). Хоосон бол бүх хүнд.</p>' : ''}
+      ${sortedTypes().map(t => { const bad = posList(t).length ? S.trs.filter(r => r.training_type_id === t.id && !typeAllowed(t, IDX.emp.get(r.employee_id))).length : 0;
+        return `<div class="set-row ${S.hasPosRule ? 'type-row' : ''}"><input class="inp" id="tn-${t.id}" value="${esc(t.name)}" data-edit="type-name" data-id="${t.id}" aria-label="Сургалтын нэр"><input class="inp mono" id="tm-${t.id}" type="number" min="1" value="${t.validity_months}" data-edit="type-months" data-id="${t.id}" aria-label="Сар">${S.hasPosRule ? `<input class="inp" value="${esc(t.only_positions||'')}" placeholder="Бүх хүнд" data-edit="type-pos" data-id="${t.id}" aria-label="Албан тушаал">` : ''}<button class="btn btn-sm btn-danger" data-act="del-type" data-id="${t.id}">Устгах</button>
+        ${bad ? `<div class="type-x"><button class="btn btn-sm btn-danger" data-act="type-clean" data-id="${t.id}">Хамааралгүй ${bad} бичлэгийг устгах</button> <span class="muted">${esc(t.only_positions)}-аас бусад албан тушаалтай хүмүүсийнх</span></div>` : ''}</div>`; }).join('')}
       <form data-form="add-type" class="set-row" style="margin-top:6px"><input class="inp" id="nt-name" name="name" placeholder="Шинэ сургалт" required><input class="inp mono" id="nt-m" name="months" type="number" min="1" value="12" aria-label="Сар"><button class="btn btn-sm" type="submit">Нэмэх</button></form>
     </div></section>
   </div>
@@ -2024,6 +2034,8 @@ function planImport(P, opt){
     const who = out.resolved[x.emp]; if(!who || who === 'skip') continue;
     const tk = normKey(x.type); let t = typeMap.get(tk);
     if(!t && opt.onlyKnown){ out.skipTypes.add(x.type); continue; }
+    if(t && !who._new && !typeAllowed(t, who)){ out.skipPos = (out.skipPos || 0) + 1; continue; }
+    if(t && who._new && posList(t).length && !typeAllowed(t, { position:who.row.pos })){ out.skipPos = (out.skipPos || 0) + 1; continue; }
     if(!t){ let nt = out.newTypes.find(n => normKey(n.name) === tk); if(!nt){ nt = { name:x.type, months:opt.months[tk] || qMonths(tk) || 12 }; out.newTypes.push(nt); } t = { _new:true, name:nt.name, validity_months:nt.months }; }
     else if(qMonths(tk) && qMonths(tk) !== t.validity_months && !out.typeFix.some(f => f.id === t.id)) out.typeFix.push({ id:t.id, name:t.name, from:t.validity_months, to:qMonths(tk) });
     const m = qMonths(tk) || t.validity_months;
@@ -2101,6 +2113,7 @@ function renderImport(){
       <label class="check"><input type="radio" name="imp-mode" value="exp" data-imp="mode" ${im.mode === 'exp' ? 'checked' : ''}>Дуусах (хүчинтэй) огноо</label>
       ${im.mode === P.guess ? '<span class="note">· огноонуудаас автоматаар таамагласан</span>' : ''}</div></div>` : ''}
     ${pl.newTypes.length ? `<div class="field"><span class="lbl-s">Шинэ сургалтын төрөл — хүчинтэй хугацаа (сар)</span>${pl.newTypes.map(n => `<div class="set-row two"><span>${esc(n.name)}</span><input class="inp mono" type="number" min="1" style="width:90px" value="${n.months}" data-imp="months" data-k="${esc(normKey(n.name))}" aria-label="${esc(n.name)} сар"></div>`).join('')}</div>` : ''}
+    ${pl.skipPos ? `<p class="note" style="margin:0">Албан тушаалд хамааралгүй ${pl.skipPos} бичлэгийг алгассан (жишээ нь Level 2 Isolation → зөвхөн Electrician).</p>` : ''}
     ${im.qual ? `<p class="note">Хамрагдсан огноо, хүчинтэй хугацааг <b>${esc(im.qual.sheet)}</b> sheet-ээс тулгаж авлаа (${pl.fromQual} бичлэг).${pl.typeFix.length ? ` ${pl.typeFix.length} сургалтын хүчинтэй хугацаа засагдана.` : ''}</p>` : ''}
     ${pl.newDepts.length ? `<p class="note">Шинэ алба үүснэ: ${pl.newDepts.map(esc).join(', ')}</p>` : ''}
     ${pl.deact.length ? `<label class="check"><input type="checkbox" data-imp="deactivate" ${im.deactivate ? 'checked' : ''}>Файлд байхгүй <b>${pl.deact.length}</b> ажилтныг "ажлаас гарсан" болгох</label>` : ''}
@@ -2235,6 +2248,9 @@ const ACT = {
   'del-admin': async a => { const em = a.dataset.email; if(!await askConfirm(`${em}-ийн админ эрхийг хасах уу? Тэр зөвхөн харах эрхтэй болно.`, 'Хасах')) return;
     await run(async () => { if(!DEMO){ const { error } = await sb.from('app_admins').delete().eq('email', em); if(error) throw error; } S.admins = S.admins.filter(x => x.email !== em); render(); }, 'Эрх хасагдлаа'); },
   'bp-apply': a => applyBulkPhotos(a),
+  'type-clean': async a => { const t = IDX.type.get(Number(a.dataset.id)); const ids = S.trs.filter(r => r.training_type_id === t.id && !typeAllowed(t, IDX.emp.get(r.employee_id))).map(r => r.id);
+    if(!await askConfirm(`"${t.name}" сургалтын ${ids.length} бичлэгийг (${t.only_positions}-аас бусад албан тушаалтай хүмүүсийнх) бүрмөсөн устгах уу?`, 'Устгах')) return;
+    await run(() => dbDeleteMany('trainings', ids), `${ids.length} бичлэг устгагдлаа`); render(); },
   'lic-add': () => { S.openEmp = null; openModal({ title:'Үнэмлэх нэмэх', wide:true, body:trForm({}, { lic:true }) }); },
   'lic-edit': a => { const t = S.trs.find(x => x.id === Number(a.dataset.id)); S.openEmp = null; openModal({ title:'Үнэмлэх засах', wide:true, body:trForm(t, { lic:true }) }); },
   'lic-renew': a => { const t = S.trs.find(x => x.id === Number(a.dataset.id)); const tt = IDX.type.get(t.training_type_id); const d = todayStr(); S.openEmp = null;
@@ -2314,7 +2330,7 @@ const ACT = {
     Object.assign(S, { ready:false, auth:'login', user:null, admin:false, admins:[], imports:[], depts:[], emps:[], trs:[], types:[], logs:[], view:'dash', org:null });
     closeModal(); document.body.classList.remove('ro'); render(); toast('Системээс гарлаа'); }
 };
-const ADMIN_ACTS = new Set(['lic-add','lic-edit','lic-renew','lic-send','lic-prev','news-new','news-edit','news-del','lic-types','bk-new','bk-item','bk-set','bk-rm','bk-cancel','bk-done','bim-apply','bp-apply','undo-imp','wipe-all','new-emp','edit-emp','del-emp','new-tr','edit-tr','renew','del-tr','bulk','bulk-all','send-now','del-dept','del-type','pick-photo','imp-apply','del-admin']);
+const ADMIN_ACTS = new Set(['type-clean','lic-add','lic-edit','lic-renew','lic-send','lic-prev','news-new','news-edit','news-del','lic-types','bk-new','bk-item','bk-set','bk-rm','bk-cancel','bk-done','bim-apply','bp-apply','undo-imp','wipe-all','new-emp','edit-emp','del-emp','new-tr','edit-tr','renew','del-tr','bulk','bulk-all','send-now','del-dept','del-type','pick-photo','imp-apply','del-admin']);
 const denied = () => { toast('Танд засах эрх алга. Админтай холбогдоно уу.','bad'); };
 document.addEventListener('click', ev => { const a = ev.target.closest('[data-act]'); if(!a) return; if(!S.admin && ADMIN_ACTS.has(a.dataset.act)){ ev.preventDefault(); return denied(); } const f = ACT[a.dataset.act]; if(f){ if(a.tagName === 'A') ev.preventDefault(); f(a, ev); } });
 document.addEventListener('keydown', ev => {
@@ -2372,6 +2388,7 @@ document.addEventListener('change', async ev => {
     if(t.dataset.edit === 'dept-email') await run(async () => { await dbUpdate('departments', id, { email:v || null }); render(); }, 'Имэйл хадгалагдлаа');
     if(t.dataset.edit === 'dept' && v) await run(async () => { await dbUpdate('departments', id, { name:v }); }, 'Хадгалагдлаа');
     if(t.dataset.edit === 'type-name' && v) await run(async () => { await dbUpdate('training_types', id, { name:v }); }, 'Хадгалагдлаа');
+    if(t.dataset.edit === 'type-pos') await run(async () => { await dbUpdate('training_types', id, { only_positions:v || null }); render(); }, 'Хадгалагдлаа');
     if(t.dataset.edit === 'type-months' && Number(v) > 0) await run(async () => { await dbUpdate('training_types', id, { validity_months:Number(v) }); }, 'Хадгалагдлаа. Шинэ бичлэгт хэрэглэгдэнэ');
   }
 });

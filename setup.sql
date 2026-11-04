@@ -94,6 +94,10 @@ create table if not exists public.import_log (
 
 -- Монгол улсын эрхийн үнэмлэх эсэх (null = нэрээр нь автоматаар: MGL…, license, үнэмлэх)
 alter table public.training_types add column if not exists is_license boolean;
+-- Зөвхөн эдгээр албан тушаалд хамаарах сургалт (таслалаар). Хоосон = бүх хүнд
+alter table public.training_types add column if not exists only_positions text;
+update public.training_types set only_positions = 'Electrical Engineer, Electrician'
+  where name ilike 'OT Level 2 Isolation%' and only_positions is null;
 
 -- ---------- Сургалт захиалга ----------
 create table if not exists public.training_bookings (
