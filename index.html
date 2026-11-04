@@ -494,7 +494,7 @@ const CONFIG = {
 const DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
 const sb = (!DEMO && window.supabase) ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY) : null;
 
-const APP_VER = '2026.11.05e';
+const APP_VER = '2026.11.05f';
 const TABLES = { news_posts:'news', booking_items:'bitems', training_bookings:'books', departments:'depts', employees:'emps', training_types:'types', trainings:'trs', reminder_log:'logs', org_nodes:'nodes' };
 const S = {
   ready:false, auth:null, user:null, view:'dash',
@@ -1763,7 +1763,9 @@ function trForm(t, opt = {}){
   return `<form data-form="training" style="display:flex;flex-direction:column;gap:12px"><input type="hidden" name="id" value="${t.id||''}"><input type="hidden" name="back" value="${opt.lic ? 'lic' : 'profile'}">
     ${e ? `<input type="hidden" name="employee_id" value="${t.employee_id}"><div style="display:flex;gap:10px;align-items:center">${avatar(e,'sm')}<b style="font-weight:500">${esc(e.full_name)}</b><span class="muted">${esc(deptName(e.department_id))}</span></div>` : empSel}
     ${opt.lic && !types.length ? '<p class="note" style="color:var(--bad)">Үнэмлэхийн төрөл алга. "Үнэмлэхийн төрөл сонгох"-оос эхлээд тохируулна уу.</p>' : ''}
-    <div class="field"><label for="t-type">Сургалт</label><select class="inp" id="t-type" name="training_type_id" required>${types.map(x => `<option value="${x.id}" data-m="${x.validity_months}" ${tt&&x.id===tt.id?'selected':''}>${esc(x.name)} · ${x.validity_months >= 600 ? 'хугацаагүй' : x.validity_months + ' сар'}</option>`).join('')}</select></div>
+    <div class="field"><label for="t-type">Сургалт</label><select class="inp" id="t-type" name="training_type_id" required>${types.map(x => `<option value="${x.id}" data-m="${x.validity_months}" ${tt&&x.id===tt.id?'selected':''}>${esc(x.name)} · ${x.validity_months >= 600 ? 'хугацаагүй' : x.validity_months + ' сар'}</option>`).join('')}${S.admin ? `<option value="__new" data-m="12" ${types.length ? '' : 'selected'}>+ Шинэ нэр нэмэх…</option>` : ''}</select></div>
+    <div class="grid2 new-type" ${types.length ? 'hidden' : ''}><div class="field"><label for="t-nname">Шинэ ${opt.lic ? 'үнэмлэхний' : 'сургалтын'} нэр</label><input class="inp" id="t-nname" name="new_type_name" placeholder="${opt.lic ? 'Жишээ нь: MGL Excavator License (P)' : 'Жишээ нь: OT Rescue Training (P)'}"></div>
+      <div class="field"><label for="t-nm">Хүчинтэй хугацаа (сар)</label><span style="display:flex;gap:10px;align-items:center"><input class="inp mono" id="t-nm" name="new_type_months" type="number" min="1" value="12" style="max-width:110px"><label class="check"><input type="checkbox" name="new_type_life">Хугацаагүй</label></span></div></div>
     <div class="grid2"><div class="field"><label for="t-done">Хамрагдсан огноо</label><input class="inp mono" id="t-done" type="date" name="completed_on" required value="${done}"></div>
       <div class="field"><label for="t-exp">Дуусах огноо</label><input class="inp mono" id="t-exp" type="date" name="expires_on" required value="${exp}"></div></div>
     <div class="grid2"><div class="field"><label for="t-cert">Гэрчилгээ №</label><input class="inp mono" id="t-cert" name="certificate_no" value="${esc(t.certificate_no||'')}"></div>
@@ -2336,7 +2338,11 @@ document.addEventListener('input', ev => {
   if('bkt' in t.dataset){ const ch = new Set($$('#bk-pick input:checked').map(i => Number(i.value))); $('#bk-pick').innerHTML = bkPick(Number(t.value), ch); const q = $('#b-q'); if(q) q.dispatchEvent(new Event('input', { bubbles:true })); }
   if(t.dataset.bulk){ const q = $('#b-q').value.trim().toLowerCase(), d = $('#b-dept').value; $$('.pick-list label').forEach(l => l.hidden = (d && l.dataset.dept !== d) || (q && !l.dataset.s.includes(q))); }
   const form = t.form;
-  if(form && (form.dataset.form === 'training' || form.dataset.form === 'bulk') && (t.name === 'training_type_id' || t.name === 'completed_on') && form.completed_on.value){
+  if(form && form.dataset.form === 'training' && (t.name === 'training_type_id' || t.name === 'new_type_months' || t.name === 'new_type_life')){
+    const isNew = form.training_type_id.value === '__new', box = form.querySelector('.new-type'); if(box) box.hidden = !isNew;
+    if(isNew){ const o = form.training_type_id.selectedOptions[0]; o.dataset.m = form.new_type_life.checked ? 1200 : (Number(form.new_type_months.value) || 12); form.new_type_months.disabled = form.new_type_life.checked; if(t.name === 'training_type_id') form.new_type_name.focus(); }
+  }
+  if(form && (form.dataset.form === 'training' || form.dataset.form === 'bulk') && (t.name === 'training_type_id' || t.name === 'completed_on' || t.name === 'new_type_months' || t.name === 'new_type_life') && form.completed_on.value){
     const m = Number(form.training_type_id.selectedOptions[0]?.dataset.m || 12); form.expires_on.value = addMonths(form.completed_on.value, m);
   }
   if(t.name === 'emp') updBulkCount();
@@ -2384,6 +2390,13 @@ const FORMS = {
   training: async f => {
     const id = num(f.id.value), emp = Number(f.employee_id.value);
     if(f.expires_on.value < f.completed_on.value) return toast('Дуусах огноо хамрагдсан огнооноос өмнө байна','bad');
+    if(f.training_type_id.value === '__new'){
+      const nm = f.new_type_name.value.trim(); if(!nm) return toast('Шинэ нэрээ бичнэ үү','bad');
+      if(S.types.some(t => normKey(t.name) === normKey(nm))) return toast('Ийм нэртэй сургалт аль хэдийн байна. Жагсаалтаас сонгоно уу','bad');
+      const months = f.new_type_life.checked ? 1200 : Math.max(1, Number(f.new_type_months.value) || 12);
+      const nt = await run(() => dbInsert('training_types', { name:nm, validity_months:months, ...(f.back.value === 'lic' && S.hasLicFlag ? { is_license:true } : {}) }), `"${nm}" нэмэгдлээ`);
+      if(!nt) return; const o = new Option(nm, nt.id); o.dataset.m = months; f.training_type_id.add(o, f.training_type_id.options.length - 1); f.training_type_id.value = nt.id; f.querySelector('.new-type').hidden = true;
+    }
     const row = { employee_id:emp, training_type_id:Number(f.training_type_id.value), completed_on:f.completed_on.value, expires_on:f.expires_on.value, certificate_no:f.certificate_no.value.trim()||null, provider:f.provider.value.trim()||null, notes:f.notes.value.trim()||null };
     if(!emp) return toast('Ажилтан сонгоно уу','bad');
     const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
