@@ -313,7 +313,7 @@ begin
     perform net.http_post(
       url     := 'https://api.resend.com/emails',
       headers := jsonb_build_object('Authorization', 'Bearer ' || api, 'Content-Type', 'application/json'),
-      body    := jsonb_build_object('from', cfg.from_email, 'to', to_jsonb(rcpt), 'subject', subj, 'html', body)
+      body    := jsonb_build_object('from', cfg.from_email, 'to', to_jsonb(rcpt), 'subject', subj, 'html', body) || case when nullif(trim(cfg.reply_to),'') is not null then jsonb_build_object('reply_to', trim(cfg.reply_to)) else '{}'::jsonb end
     );
 
     insert into public.reminder_log (training_id, days_before, recipients)
@@ -340,7 +340,9 @@ select cron.schedule('training-reminders', '0 1 * * *', 'select public.send_trai
 alter table public.departments add column if not exists email text;
 alter table public.settings add column if not exists lic_cc      text not null default 'hse@premiumconcrete.mn, leadteam@premiumconcrete.mn';
 alter table public.settings add column if not exists lic_days    int  not null default 60;
-alter table public.settings add column if not exists lic_weekday int  not null default 1;   -- 1 = Даваа … 7 = Ням, 0 = унтраах
+alter table public.settings add column if not exists lic_weekday int  not null default 5;   -- 1 = Даваа … 5 = Баасан … 7 = Ням, 0 = унтраах
+alter table public.settings alter column lic_weekday set default 5;
+alter table public.settings add column if not exists reply_to text default 'turbayar.o@premiumconcrete.mn';
 update public.departments set email = v.email from (values
   ('bp','bp@premiumconcrete.mn'), ('mt','mt@premiumconcrete.mn'), ('cp','cp@premiumconcrete.mn'),
   ('wh','warehouse@premiumconcrete.mn'), ('qaqc','qaqc@premiumconcrete.mn')) v(k, email)
@@ -416,7 +418,7 @@ begin
     perform net.http_post(
       url     := 'https://api.resend.com/emails',
       headers := jsonb_build_object('Authorization', 'Bearer ' || api, 'Content-Type', 'application/json'),
-      body    := jsonb_build_object('from', cfg.from_email, 'to', to_jsonb(rcpt),
+      body    := case when nullif(trim(cfg.reply_to),'') is not null then jsonb_build_object('reply_to', trim(cfg.reply_to)) else '{}'::jsonb end || jsonb_build_object('from', cfg.from_email, 'to', to_jsonb(rcpt),
         'cc', to_jsonb(array(select x from unnest(cc) x where x <> all(rcpt))),
         'subject', '[' || d.name || '] Эрхийн үнэмлэх: ' || nbad || ' дууссан, ' || (n - nbad) || ' дуусах дөхсөн — ' || to_char(today,'YYYY.MM.DD'),
         'html', '<div style="font-family:Arial,sans-serif;font-size:14px;color:#172033"><p>Сайн байна уу,</p>'
