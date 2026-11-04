@@ -176,6 +176,12 @@ textarea.inp{resize:vertical;min-height:70px}
 .chip-acc{background:var(--accent-soft);color:var(--accent)}
 .bk-list{display:flex;flex-direction:column;gap:10px}
 .bk-days{display:flex;flex-direction:column;gap:14px}
+.news-list{display:flex;flex-direction:column;gap:14px;max-width:860px}
+.news{overflow:hidden} .news.pinned{border-color:var(--warn)}
+.news-img{display:block;width:100%;max-height:360px;object-fit:cover;background:var(--surface-2)}
+.news-meta{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-size:12.5px}
+.news-title{font-size:19px;font-weight:700}
+.news-body{font-size:14.5px;line-height:1.6;overflow-wrap:anywhere}
 #bk-body{display:flex;flex-direction:column;gap:12px}
 .due-g summary{list-style:none} .due-g summary::-webkit-details-marker{display:none}
 .due-g summary h2::before{content:"▸ ";color:var(--faint)} .due-g[open] summary h2::before{content:"▾ "}
@@ -470,7 +476,7 @@ const CONFIG = {
 const DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
 const sb = (!DEMO && window.supabase) ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY) : null;
 
-const TABLES = { booking_items:'bitems', training_bookings:'books', departments:'depts', employees:'emps', training_types:'types', trainings:'trs', reminder_log:'logs', org_nodes:'nodes' };
+const TABLES = { news_posts:'news', booking_items:'bitems', training_bookings:'books', departments:'depts', employees:'emps', training_types:'types', trainings:'trs', reminder_log:'logs', org_nodes:'nodes' };
 const S = {
   ready:false, auth:null, user:null, view:'dash',
   depts:[], emps:[], types:[], trs:[], logs:[],
@@ -665,7 +671,7 @@ async function fetchAll(table){
   return out;
 }
 async function loadAll(){
-  if(DEMO){ S.extra = true; seedDemo(); S.imports = []; S.nodes = []; S.books = []; S.bitems = []; S.hasBook = true; S.hasLicFlag = true; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
+  if(DEMO){ S.extra = true; seedDemo(); S.imports = []; S.nodes = []; S.books = []; S.bitems = []; S.hasBook = true; S.news = []; S.hasNews = true; S.hasLicFlag = true; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
   const [d,e,t,tr] = await Promise.all(['departments','employees','training_types','trainings'].map(fetchAll));
   const l = await sb.from('reminder_log').select('*').order('sent_at',{ascending:false}).limit(2000);
   const s = await sb.from('settings').select('*').eq('id',1).maybeSingle();
@@ -678,6 +684,7 @@ async function loadAll(){
   S.admins = [];
   if(S.admin){ const a = await sb.from('app_admins').select('*').order('added_at'); if(!a.error) S.admins = a.data; }
   { const t = await sb.from('employees').select('roster,poi').limit(1); S.extra = !t.error; }
+  try{ S.news = await fetchAll('news_posts'); S.hasNews = true; } catch(e){ console.warn('news:', e.message); S.news = []; S.hasNews = false; }
   try{ S.bitems = await fetchAll('booking_items'); S.hasBook = true; } catch(e){ console.warn('booking_items:', e.message); S.bitems = []; S.hasBook = false; }
   S.books = [];
   { const t = await sb.from('training_types').select('is_license').limit(1); S.hasLicFlag = !t.error; }
@@ -825,6 +832,7 @@ function seedDemo(){
 const I = {
   dash:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>',
   emps:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6"/><path d="M16 4a4 4 0 0 1 0 8M22 21c0-3-1.5-5-4-5.7"/></svg>',
+  news:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h13v14a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2z"/><path d="M17 9h3v10a2 2 0 0 1-2 2"/><path d="M8 9h5M8 13h5M8 17h3"/></svg>',
   lic:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2.5"/><path d="M13 10h6M13 14h4"/></svg>',
   book:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18M9 15l2 2 4-4"/></svg>',
   trs:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>',
@@ -846,11 +854,11 @@ function render(){
   const bad = activeCurrent().filter(c => c.status === 'bad').length;
   document.body.classList.toggle('ro', !S.admin);
   if(!S.admin && S.view === 'settings') S.view = 'dash';
-  const nav = [['dash','Хянах самбар'],['org','Алба'],['emps','Ажилтнууд'],['trs','Сургалтын бүртгэл'],['book','Сургалт захиалга'],['lic','Эрхийн үнэмлэх'], ...(S.admin ? [['settings','Тохиргоо']] : [])];
+  const nav = [['dash','Хянах самбар'],['org','Алба'],['emps','Ажилтнууд'],['trs','Сургалтын бүртгэл'],['book','Сургалт захиалга'],['lic','Эрхийн үнэмлэх'],['news','Мэдээ мэдээлэл'], ...(S.admin ? [['settings','Тохиргоо']] : [])];
   app.innerHTML = `<div class="shell">
     <aside class="side">
       <div class="brand"><img class="brand-logo" src="logo-dark.png" alt="Premium"><img class="brand-mark-img" src="logo-mark.png" alt="Premium"><span class="brand-app">Сургалтын бүртгэл</span></div>
-      <nav class="nav" aria-label="Цэс">${nav.map(([k,l]) => `<button data-act="nav" data-v="${k}" ${S.view===k?'aria-current="page"':''}>${I[k]}<span class="lbl">${l}</span>${k==='trs'&&bad?`<span class="badge">${bad}</span>`:''}</button>`).join('')}</nav>
+      <nav class="nav" aria-label="Цэс">${nav.map(([k,l]) => `<button data-act="nav" data-v="${k}" ${S.view===k?'aria-current="page"':''}>${I[k]}<span class="lbl">${l}</span>${k==='trs'&&bad?`<span class="badge">${bad}</span>`:''}${k==='news'&&newsUnread()?`<span class="badge" style="background:#3d7be0">${newsUnread()}</span>`:''}</button>`).join('')}</nav>
       <div class="side-foot">${DEMO ? '<span>Демо горим</span>' : `<span class="role ${S.admin?'adm':'view'}">${S.admin?'Админ':'Зөвхөн харах'}</span><span class="who-email">${esc(S.user?.email||'')}</span><button class="logout" data-act="logout" title="Системээс гарах" aria-label="Системээс гарах">${I.out}<span class="lbl">Системээс гарах</span></button>`}</div>
     </aside>
     <main class="main"><div class="wrap">${DEMO ? demoBar() : ''}${!DEMO && !S.admin ? '<div class="ro-note">Танд <b>зөвхөн харах</b> эрх байна (Алба цэсний бүтцийг засах боломжтой). Бусад мэдээлэл засах бол админтай холбогдоно уу: <a href="mailto:Turbayar.O@premiumconcrete.mn?subject=%D0%A1%D1%83%D1%80%D0%B3%D0%B0%D0%BB%D1%82%D1%82%D0%B0%D0%B9%20%D1%85%D0%BE%D0%BB%D0%B1%D0%BE%D0%BE%D1%82%D0%BE%D0%B9%20%D1%85%D2%AF%D1%81%D1%8D%D0%BB%D1%82"><b>Turbayar.O@premiumconcrete.mn</b></a></div>' : ''}${VIEWS[S.view]()}</div></main>
@@ -1463,6 +1471,57 @@ async function applyBookImport(){
   return { ins:pl.ins.length, upd:pl.upd.length, del:im.delMissing ? pl.del.length : 0 };
 }
 
+/* --- Мэдээ мэдээлэл --- */
+const NEWS_CAT = ['Мэдэгдэл','Сургалт','ХАБЭА','Үнэмлэх','Бусад'];
+const newsKey = () => 'news_seen_' + (S.user?.email || 'demo');
+const newsSeenAt = () => { try{ return localStorage.getItem(newsKey()) || ''; } catch{ return ''; } };
+const newsUnread = () => { if(S.view === 'news') return 0; const t = newsSeenAt(); return (S.news || []).filter(n => n.created_at > t && n.author !== S.user?.email).length; };
+const newsSeen = () => { try{ localStorage.setItem(newsKey(), new Date().toISOString()); } catch{} };
+const linkify = t => esc(t).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>').replace(/\n/g, '<br>');
+const ago = iso => { const d = Math.floor((Date.now() - new Date(iso)) / 86400000); return d <= 0 ? 'Өнөөдөр' : d === 1 ? 'Өчигдөр' : d < 7 ? d + ' өдрийн өмнө' : fmtDate(ymd(new Date(iso))); };
+function viewNews(){
+  if(!S.hasNews) return `<div class="page-head"><div><h1>Мэдээ мэдээлэл</h1></div></div><div class="panel panel-body"><p class="note">Энэ хэсгийг ашиглахын тулд Supabase дээр шинэчлэгдсэн <b>setup.sql</b>-ийг дахин ажиллуулна уу.</p></div>`;
+  const f = S.nf ||= { cat:'', q:'' }, q = f.q.trim().toLowerCase();
+  const list = [...S.news].filter(n => (!f.cat || n.category === f.cat) && (!q || (n.title + ' ' + (n.body||'')).toLowerCase().includes(q)))
+    .sort((a, b) => (b.pinned - a.pinned) || b.created_at.localeCompare(a.created_at));
+  const cats = NEWS_CAT.filter(c => S.news.some(n => n.category === c));
+  return `<div class="page-head"><div><h1>Мэдээ мэдээлэл</h1><p>Сургалт, ХАБЭА, байгууллагын мэдэгдэл</p></div>
+    <div class="actions">${S.admin ? '<button class="btn btn-primary" data-act="news-new">+ Мэдээ нийтлэх</button>' : ''}</div></div>
+  ${S.news.length ? `<div class="toolbar"><span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm ${!f.cat ? 'btn-primary' : ''}" data-act="news-cat" data-c="">Бүгд</button>${cats.map(c => `<button class="btn btn-sm ${f.cat === c ? 'btn-primary' : ''}" data-act="news-cat" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</span>
+    <input class="inp search" type="search" placeholder="Мэдээ хайх" value="${esc(f.q)}" data-nf aria-label="Хайх"></div>` : ''}
+  <div class="news-list" id="news-list">${list.length ? list.map(newsCard).join('') : `<div class="panel empty">${S.news.length ? 'Тохирох мэдээ алга.' : 'Одоогоор мэдээ нийтлээгүй байна.'}</div>`}</div>`;
+}
+function newsCard(n){
+  const seen = newsSeenAt(), isNew = n.created_at > seen && n.author !== S.user?.email;
+  return `<article class="panel news ${n.pinned ? 'pinned' : ''}">
+    ${n.image_url ? `<img class="news-img" src="${esc(n.image_url)}" alt="" loading="lazy">` : ''}
+    <div class="panel-body" style="display:flex;flex-direction:column;gap:8px">
+      <div class="news-meta">${n.pinned ? '<span class="chip chip-warn">📌 Тогтоосон</span>' : ''}${n.category ? `<span class="chip chip-acc">${esc(n.category)}</span>` : ''}${isNew ? '<span class="chip chip-bad">Шинэ</span>' : ''}<span class="muted">${ago(n.created_at)}${n.author ? ' · ' + esc(n.author) : ''}${n.updated_at ? ' · засварласан' : ''}</span>
+        ${S.admin ? `<span style="margin-left:auto;display:flex;gap:6px"><button class="btn btn-sm" data-act="news-edit" data-id="${n.id}">Засах</button><button class="btn btn-sm btn-danger" data-act="news-del" data-id="${n.id}">Устгах</button></span>` : ''}</div>
+      <h2 class="news-title">${esc(n.title)}</h2>
+      ${n.body ? `<div class="news-body">${linkify(n.body)}</div>` : ''}
+      ${n.link_url ? `<a class="btn btn-sm" style="align-self:flex-start" href="${esc(n.link_url)}" target="_blank" rel="noopener">Дэлгэрэнгүй / файл →</a>` : ''}
+    </div></article>`;
+}
+function newsForm(n){
+  n = n || {};
+  return `<form data-form="news" style="display:flex;flex-direction:column;gap:12px"><input type="hidden" name="id" value="${n.id||''}">
+    <div class="field"><label for="nw-t">Гарчиг</label><input class="inp" id="nw-t" name="title" required value="${esc(n.title||'')}" placeholder="Жишээ нь: 11-р сарын Fire Safety сургалтын хуваарь"></div>
+    <div class="grid2"><div class="field"><label for="nw-c">Ангилал</label><select class="inp" id="nw-c" name="category">${NEWS_CAT.map(c => `<option ${(n.category||'Мэдэгдэл') === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
+      <div class="field"><label>&nbsp;</label><label class="check"><input type="checkbox" name="pinned" ${n.pinned ? 'checked' : ''}>Дээр нь тогтоох</label></div></div>
+    <div class="field"><label for="nw-b">Агуулга</label><textarea class="inp" id="nw-b" name="body" style="min-height:160px">${esc(n.body||'')}</textarea></div>
+    <div class="field"><label for="nw-l">Холбоос (заавал биш)</label><input class="inp" id="nw-l" name="link_url" type="url" value="${esc(n.link_url||'')}" placeholder="https://… (бүртгэлийн форм, файл, Teams линк)"></div>
+    <div class="field"><label for="nw-i">Зураг (заавал биш)</label><input class="inp" id="nw-i" name="image" type="file" accept="image/*">${n.image_url ? `<label class="check"><input type="checkbox" name="rmimg">Одоогийн зургийг хасах</label>` : ''}</div>
+    <div class="m-foot"><button class="btn" type="button" data-act="close">Болих</button><button class="btn btn-primary" type="submit">${n.id ? 'Хадгалах' : 'Нийтлэх'}</button></div></form>`;
+}
+async function uploadNewsImage(file){
+  if(DEMO) return URL.createObjectURL(file);
+  const big = await new Promise((res, rej) => { const u = URL.createObjectURL(file), img = new Image(); img.onload = () => { const w = Math.min(1400, img.width), h = Math.round(img.height * w / img.width), c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h); URL.revokeObjectURL(u); c.toBlob(b => b ? res(b) : rej(new Error('Зураг уншиж чадсангүй')), 'image/jpeg', .85); }; img.onerror = () => rej(new Error('Зургийн формат танигдсангүй')); img.src = u; });
+  const path = `news-${Date.now()}.jpg`;
+  const { error } = await sb.storage.from('photos').upload(path, big, { contentType:'image/jpeg', upsert:false }); if(error) throw error;
+  return sb.storage.from('photos').getPublicUrl(path).data.publicUrl;
+}
+
 /* --- settings --- */
 function viewSettings(){
   const s = S.settings, pend = pendingReminders();
@@ -1533,7 +1592,7 @@ E001 | Б.Батбаяр | Галын аюулгүй байдал | 2026-03-15  
     ${importsPanel()}
   </div></section>`;
 }
-const VIEWS = { dash:viewDash, org:viewOrg, emps:viewEmps, trs:viewTrs, book:viewBook, lic:viewLic, settings:viewSettings };
+const VIEWS = { news:viewNews, dash:viewDash, org:viewOrg, emps:viewEmps, trs:viewTrs, book:viewBook, lic:viewLic, settings:viewSettings };
 
 /* ---------- modals ---------- */
 function openModal({ title, body, wide=false, drawer=false }){
@@ -2050,7 +2109,7 @@ function exportCSV(){
 
 /* ---------- events ---------- */
 const ACT = {
-  nav: a => { S.view = a.dataset.v; if(S.view === 'org') S.org = null; render(); window.scrollTo(0,0); },
+  nav: a => { S.view = a.dataset.v; if(S.view === 'news') newsSeen(); if(S.view === 'org') S.org = null; render(); window.scrollTo(0,0); },
   'goto-trs': a => { const st = a.dataset.st||'', dept = a.dataset.dept||''; if(!st || st === 'none'){ S.view = 'emps'; S.ef = { q:'', dept, status:'none', inactive:false }; } else { S.view = 'trs'; S.tf = { q:'', dept, type:'', status:st }; } render(); window.scrollTo(0,0); },
   'goto-org': a => { S.view = 'org'; S.org = a.dataset.dept ? Number(a.dataset.dept) : null; render(); window.scrollTo(0,0); },
   'org-back': () => { S.org = null; render(); window.scrollTo(0,0); },
@@ -2081,6 +2140,10 @@ const ACT = {
   'del-admin': async a => { const em = a.dataset.email; if(!await askConfirm(`${em}-ийн админ эрхийг хасах уу? Тэр зөвхөн харах эрхтэй болно.`, 'Хасах')) return;
     await run(async () => { if(!DEMO){ const { error } = await sb.from('app_admins').delete().eq('email', em); if(error) throw error; } S.admins = S.admins.filter(x => x.email !== em); render(); }, 'Эрх хасагдлаа'); },
   'bp-apply': a => applyBulkPhotos(a),
+  'news-new': () => openModal({ title:'Мэдээ нийтлэх', wide:true, body:newsForm(null) }),
+  'news-edit': a => { const n = S.news.find(x => x.id === Number(a.dataset.id)); if(n) openModal({ title:'Мэдээ засах', wide:true, body:newsForm(n) }); },
+  'news-del': async a => { if(!await askConfirm('Энэ мэдээг устгах уу?')) return; await run(() => dbDelete('news_posts', Number(a.dataset.id)), 'Устгагдлаа'); render(); },
+  'news-cat': a => { S.nf.cat = a.dataset.c; render(); },
   'lic-f': a => { S.lf = { q:'', dept:'', type:'', status:a.dataset.st||'' }; render(); },
   'lic-type': a => { S.lf ||= { q:'', dept:'', type:'', status:'' }; S.lf.type = String(S.lf.type) === a.dataset.id ? '' : a.dataset.id; render(); },
   'lic-types': () => openModal({ title:'Үнэмлэхийн төрөл сонгох', wide:true, body:`<form data-form="lic-types" style="display:flex;flex-direction:column;gap:10px"><p class="note" style="margin:0">Аль сургалт нь Монгол улсын эрхийн үнэмлэх болохыг чагтална.</p>
@@ -2142,7 +2205,7 @@ const ACT = {
     Object.assign(S, { ready:false, auth:'login', user:null, admin:false, admins:[], imports:[], depts:[], emps:[], trs:[], types:[], logs:[], view:'dash', org:null });
     closeModal(); document.body.classList.remove('ro'); render(); toast('Системээс гарлаа'); }
 };
-const ADMIN_ACTS = new Set(['lic-types','bk-new','bk-item','bk-set','bk-rm','bk-cancel','bk-done','bim-apply','bp-apply','undo-imp','wipe-all','new-emp','edit-emp','del-emp','new-tr','edit-tr','renew','del-tr','bulk','bulk-all','send-now','del-dept','del-type','pick-photo','imp-apply','del-admin']);
+const ADMIN_ACTS = new Set(['news-new','news-edit','news-del','lic-types','bk-new','bk-item','bk-set','bk-rm','bk-cancel','bk-done','bim-apply','bp-apply','undo-imp','wipe-all','new-emp','edit-emp','del-emp','new-tr','edit-tr','renew','del-tr','bulk','bulk-all','send-now','del-dept','del-type','pick-photo','imp-apply','del-admin']);
 const denied = () => { toast('Танд засах эрх алга. Админтай холбогдоно уу.','bad'); };
 document.addEventListener('click', ev => { const a = ev.target.closest('[data-act]'); if(!a) return; if(!S.admin && ADMIN_ACTS.has(a.dataset.act)){ ev.preventDefault(); return denied(); } const f = ACT[a.dataset.act]; if(f){ if(a.tagName === 'A') ev.preventDefault(); f(a, ev); } });
 document.addEventListener('keydown', ev => {
@@ -2161,6 +2224,7 @@ document.addEventListener('input', ev => {
   const t = ev.target;
   if(t.dataset.filter){ const o = S[t.dataset.filter]; o[t.dataset.key] = t.type === 'checkbox' ? t.checked : t.value; $('#list').innerHTML = t.dataset.filter === 'ef' ? listEmps() : t.dataset.filter === 'lf' ? listLic() : listTrs(); }
   if(t.dataset.bv !== undefined && S.bv){ S.bv[t.dataset.bv] = t.value; if(t.dataset.bv === 'q'){ $('#bk-body').innerHTML = S.bv.view === 'due' ? bkDueView(dueList()) : S.bv.view === 'dept' ? bkDeptView(bkFiltered()) : S.bv.view === 'type' ? bkTypeView(bkFiltered()) : bkDayView(bkFiltered()); } else render(); }
+  if('nf' in t.dataset && S.nf){ S.nf.q = t.value; const f = S.nf, q = f.q.trim().toLowerCase(); $('#news-list').innerHTML = [...S.news].filter(n => (!f.cat || n.category === f.cat) && (!q || (n.title + ' ' + (n.body||'')).toLowerCase().includes(q))).sort((a, b) => (b.pinned - a.pinned) || b.created_at.localeCompare(a.created_at)).map(newsCard).join('') || '<div class="panel empty">Тохирох мэдээ алга.</div>'; }
   if('bkt' in t.dataset){ const ch = new Set($$('#bk-pick input:checked').map(i => Number(i.value))); $('#bk-pick').innerHTML = bkPick(Number(t.value), ch); const q = $('#b-q'); if(q) q.dispatchEvent(new Event('input', { bubbles:true })); }
   if(t.dataset.bulk){ const q = $('#b-q').value.trim().toLowerCase(), d = $('#b-dept').value; $$('.pick-list label').forEach(l => l.hidden = (d && l.dataset.dept !== d) || (q && !l.dataset.s.includes(q))); }
   const form = t.form;
@@ -2242,6 +2306,11 @@ const FORMS = {
     const r = await run(async () => { const yes = all.filter(x => on.has(x.id)); const n = await bkMakeTrainings(yes, d);
       for(const x of all) await dbUpdate('booking_items', x.id, { status:on.has(x.id) ? 'done' : 'noshow' }); return n; }, n => `${on.size} хүн явагдсан, ${n} сургалтын бичлэг үүслээ`);
     if(r != null){ closeModal(); render(); } },
+  news: async f => { const id = num(f.id.value), btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+    const r = await run(async () => { const row = { title:f.title.value.trim(), body:f.body.value.trim() || null, category:f.category.value, pinned:f.pinned.checked, link_url:f.link_url.value.trim() || null };
+      if(f.image.files[0]) row.image_url = await uploadNewsImage(f.image.files[0]); else if(f.rmimg?.checked) row.image_url = null;
+      if(id){ row.updated_at = new Date().toISOString(); return dbUpdate('news_posts', id, row); } row.author = S.user?.email || null; row.created_at = new Date().toISOString(); return dbInsert('news_posts', row); }, id ? 'Хадгалагдлаа' : 'Мэдээ нийтлэгдлээ');
+    btn.disabled = false; if(r){ closeModal(); render(); } },
   'lic-types': async f => { if(!S.hasLicFlag) return toast('Эхлээд setup.sql-ийг Supabase дээр ажиллуулна уу','bad');
     const on = new Set($$('input[name=lic]:checked', f).map(i => Number(i.value)));
     const r = await run(async () => { for(const t of S.types){ const v = on.has(t.id); if(isLic(t) !== v || t.is_license == null) await dbUpdate('training_types', t.id, { is_license:v }); } return true; }, 'Хадгалагдлаа'); if(r){ closeModal(); render(); } },
