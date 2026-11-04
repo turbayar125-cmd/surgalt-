@@ -1513,12 +1513,13 @@ function viewSettings(){
   </div></section>
   <section class="panel" id="import"><div class="panel-head"><h2>Excel матриц оруулах</h2><span class="last-imp">${lastImportText()}</span></div><div class="panel-body" style="display:flex;flex-direction:column;gap:14px">
     <div class="drop" data-drop>
-      <b>Сургалтын матриц (.xlsx) эсвэл CSV файлаа энд чирж оруулна</b>
+      <b>Qualification record (.xlsx) файлаа энд чирж оруулна</b>
       <span class="note" style="max-width:560px">Долоо хоног бүр шинэчилсэн файлаа оруулахад шинэ сургалтууд нэмэгдэж, ажилтны мэдээлэл шинэчлэгдэнэ. Аль хэдийн байгаа бичлэг давхардахгүй. Оруулахаас өмнө юу өөрчлөгдөхийг урьдчилан харуулна.</span>
       ${importBtn('Файл сонгох', 'btn btn-primary')}
     </div>
     <details class="hist"><summary>Ямар хэлбэрийн файл уншдаг вэ?</summary>
       <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+        <p class="note"><b>Qualification record (үндсэн)</b>: Worker, Employee ID, Program, Completion Date, Expiration Date баганатай. Хүн × сургалт бүрээс хамгийн сүүлд хамрагдсан бичлэгийг авч, <b>зөвхөн бүртгэлтэй ажилтнуудыг</b> шинэчилнэ. Ажилтны нэр, алба, идэвхтэй эсэхийг өөрчлөхгүй.</p>
         <p class="note"><b>1. Матриц</b> — мөр бүр ажилтан, багана бүр сургалт, нүдэнд огноо. Хамрагдсан эсвэл дуусах огноо эсэхийг оруулахдаа сонгоно.</p>
         <pre class="code">Код  | Овог нэр   | Алба | Албан тушаал | Галын аюулгүй байдал | Анхны тусламж
 E001 | Б.Батбаяр  | BP   | Оператор     | 2026.03.15           | 2025.11.02</pre>
@@ -1696,7 +1697,7 @@ const HDR = {
   poi:/^(poi|point\s*of\s*hire|hire\s*point|ажилд\s*авсан\s*газар|харьяа\s*газар)$/i,
   hired:/ажилд\s*орсон|hire\s*date|start\s*date|date\s*joined/i,
   mgr:  /^(шууд\s*)?удирдлага(ын\s*нэр)?$|^(line\s*)?manager$|^supervisor$|reports?\s*to/i,
-  ttype:/^(сургалт(ын\s*(нэр|төрөл))?|training(\s*(name|type))?|course)$/i,
+  ttype:/^(сургалт(ын\s*(нэр|төрөл))?|training(\s*(name|type))?|course|program(me)?(\s*name)?)$/i,
   done: /хамрагдсан|completed?|completion|сургалтад\s*орсон|^огноо$|^date$|issued?/i,
   exp:  /дуусах|хүчинтэй|expir|valid\s*(until|to|till)|due\s*date|^due$/i,
   cert: /гэрчилгээ|certificate|cert\b|үнэмлэх/i,
@@ -1753,7 +1754,7 @@ function parseMatrix(rows){
     [...groups].forEach(([k, g]) => { if(g.cols.date == null && g.cols.done == null && g.cols.exp == null) groups.delete(k); });
   }
   // 4. мөрүүд
-  const emps = [], recs = [], errors = []; let section = '';
+  const emps = [], recs = [], errors = []; let section = ''; const empIdx = new Map();
   data.forEach((r, i) => {
     const get = k => col[k] != null ? r[col[k]] : '';
     const filled = r.filter(v => cellStr(v)).length;
@@ -1764,7 +1765,9 @@ function parseMatrix(rows){
     if(/^\d+([.,]\d+)?$/.test(name)) return; // томьёоны хог мөр (жишээ нь бүх нүдэнд "229")
     name = cleanName(name);
     const hired = cellDate(get('hired'));
-    const ei = emps.push({ line:lineNo(i), code, name, dept:cellStr(get('dept')) || section, pos:cellStr(get('pos')), email:cellStr(get('email')), phone:cellStr(get('phone')), hired, mgr:cellStr(get('mgr')), roster:cellStr(get('roster')), poi:cellStr(get('poi')) }) - 1;
+    const ek = isLong ? (code ? 'c:' + codeK(code) : 'n:' + normKey(name)) : null;
+    const ei = ek && empIdx.has(ek) ? empIdx.get(ek) : emps.push({ line:lineNo(i), code, name, dept:cellStr(get('dept')) || section, pos:cellStr(get('pos')), email:cellStr(get('email')), phone:cellStr(get('phone')), hired, mgr:cellStr(get('mgr')), roster:cellStr(get('roster')), poi:cellStr(get('poi')) }) - 1;
+    if(ek) empIdx.set(ek, ei);
     if(isLong){
       const t = cellStr(r[longCols.ttype]); if(!t) return;
       const done = longCols.done != null ? cellDate(r[longCols.done]) : null, exp = longCols.exp != null ? cellDate(r[longCols.exp]) : null;
@@ -1776,10 +1779,16 @@ function parseMatrix(rows){
       recs.push({ emp:ei, line:lineNo(i), type:g.name, done, exp, date, cert:c.cert != null ? cellStr(r[c.cert]) : '', prov:c.prov != null ? cellStr(r[c.prov]) : '' });
     }
   });
+  if(isLong){ // Qualification record: хүн × сургалт бүрээс хамгийн сүүлийнхийг
+    const best = new Map();
+    for(const x of recs){ const k = x.emp + '|' + normKey(x.type), sk = (x.done || '') + '|' + (x.exp || ''), b = best.get(k);
+      if(!b || sk > b.sk) best.set(k, { x, sk }); }
+    var olderCount = recs.length - best.size; recs.length = 0; recs.push(...[...best.values()].map(v => v.x));
+  }
   const dateVals = recs.filter(x => x.date).map(x => x.date), today = todayStr();
   const guess = dateVals.length && dateVals.filter(d => d > today).length / dateVals.length > .5 ? 'exp' : 'done';
   const found = Object.keys(col).map(k => ({ code:'Код', name:'Овог нэр', last:'Овог', dept:'Алба', pos:'Албан тушаал', email:'Имэйл', phone:'Утас', hired:'Ажилд орсон', mgr:'Удирдлага', roster:'Ээлж', poi:'POI' })[k]);
-  return { headerLine:hi+1, subMode, isLong, found, groups:[...groups.values()].map(g => g.name), skipped, emps, recs, errors, hasAmbig:dateVals.length > 0, guess, sections: !col.dept && emps.some(e => e.dept) };
+  return { older: typeof olderCount === 'number' ? olderCount : 0, headerLine:hi+1, subMode, isLong, found, groups:[...groups.values()].map(g => g.name), skipped, emps, recs, errors, hasAmbig:dateVals.length > 0, guess, sections: !col.dept && emps.some(e => e.dept) };
 }
 
 const cleanName = n => cellStr(n).replace(/\s*\[[^\]]{1,4}\]\s*$/, '').trim(); // "Нэр [C]" → "Нэр"
@@ -1822,7 +1831,7 @@ function planImport(P, opt){
   const byCode = new Map(S.emps.filter(e => e.emp_code).map(e => [codeK(e.emp_code), e]));
   const byName = new Map(); S.emps.forEach(e => nameKeys(e.full_name).forEach(k => { if(!byName.has(k)) byName.set(k, []); byName.get(k).push(e); }));
   const typeMap = new Map(S.types.map(t => [normKey(t.name), t]));
-  const out = { empNew:[], empUpd:[], empSame:0, recNew:[], recSame:0, recOld:0, newTypes:[], newDepts:[], errors:[...P.errors], resolved:[], typeFix:[], deact:[], fromQual:0 };
+  const out = { empNew:[], empUpd:[], empSame:0, recNew:[], recSame:0, recOld:0, newTypes:[], newDepts:[], errors:[...P.errors], resolved:[], typeFix:[], deact:[], fromQual:0, skipTypes:new Set() };
   const Q = opt.qual, qMonths = tk => Q?.months.get(tk);
   const newKeys = new Map();
   P.emps.forEach((r, i) => {
@@ -1844,8 +1853,8 @@ function planImport(P, opt){
       if(S.extra && r.poi && r.poi !== (e.poi||'')) patch.poi = r.poi;
       if(r.hired && r.hired !== e.hired_on) patch.hired_on = r.hired;
       if(r.code && !e.emp_code) patch.emp_code = r.code;
-      if(r.name && r.code && r.name !== e.full_name) patch.full_name = r.name;
-      if(!e.active) patch.active = true;
+      if(r.name && r.code && r.name !== e.full_name && !P.isLong) patch.full_name = r.name; // Qualification-ийн нэрээр ажилтны жагсаалтыг дарж бичихгүй
+      if(!e.active && !P.isLong) patch.active = true; // Qualification record-д гарсан хүмүүс ч байдаг тул идэвхжүүлэхгүй
       if(Object.keys(patch).length) out.empUpd.push({ e, patch, row:r }); else out.empSame++;
     } else if(!r.name){ out.errors.push(`${r.line}-р мөр: "${r.code}" кодтой ажилтан системд алга, нэр нь хоосон`); out.resolved[i] = 'skip'; }
     else if(!opt.addNew){ out.errors.push(`${r.line}-р мөр: "${r.name}" системд алга (алгаслаа)`); out.resolved[i] = 'skip'; }
@@ -1860,6 +1869,7 @@ function planImport(P, opt){
   for(const x of P.recs){
     const who = out.resolved[x.emp]; if(!who || who === 'skip') continue;
     const tk = normKey(x.type); let t = typeMap.get(tk);
+    if(!t && opt.onlyKnown){ out.skipTypes.add(x.type); continue; }
     if(!t){ let nt = out.newTypes.find(n => normKey(n.name) === tk); if(!nt){ nt = { name:x.type, months:opt.months[tk] || qMonths(tk) || 12 }; out.newTypes.push(nt); } t = { _new:true, name:nt.name, validity_months:nt.months }; }
     else if(qMonths(tk) && qMonths(tk) !== t.validity_months && !out.typeFix.some(f => f.id === t.id)) out.typeFix.push({ id:t.id, name:t.name, from:t.validity_months, to:qMonths(tk) });
     const m = qMonths(tk) || t.validity_months;
@@ -1867,7 +1877,7 @@ function planImport(P, opt){
     if(x.date && !done && !exp){ if(opt.mode === 'exp') exp = x.date; else done = x.date; }
     if(exp && !done && Q){ const code = normKey(P.emps[x.emp].code); const qd = code && Q.done.get(code + '|' + tk + '|' + exp); if(qd && qd <= exp){ done = qd; out.fromQual++; } }
     if(done && !exp) exp = addMonths(done, m); if(exp && !done) done = addMonths(exp, -m);
-    if(exp < done){ out.errors.push(`${x.line}-р мөр: "${x.type}" дуусах огноо хамрагдсанаас өмнө байна`); continue; }
+    if(exp < done || (P.isLong && exp === done && x.done && x.exp)){ if(P.isLong){ exp = addMonths(done, m || 12); out.fixedExp = (out.fixedExp || 0) + 1; } else { out.errors.push(`${x.line}-р мөр: "${x.type}" дуусах огноо хамрагдсанаас өмнө байна`); continue; } }
     const dk = (who._new ? 'n' + out.empNew.indexOf(who) : who.id) + '|' + tk + '|' + done;
     if(seen.has(dk)) continue; seen.add(dk);
     if(!who._new && !t._new){
@@ -1897,8 +1907,9 @@ async function startImport(file){
     const mx = sheets.findIndex(sh => /^\s*matrix\s*$/i.test(sh.name));
     if(mx >= 0) si = mx; // "Matrix" sheet байвал түүнийг ашиглана
     else sheets.forEach((sh, i) => { try{ const P = parseMatrix(sh.rows); const n = P.recs.length * 2 + P.emps.length; if(n > bestN){ bestN = n; si = i; } } catch{} });
-    const qual = buildQual(sheets.filter((_, i) => i !== si));
-    S.imp = { file:file.name, sheets, si, mode:null, months:{}, addNew:true, qual, deactivate: mx >= 0 };
+    const qual = buildQual(sheets.filter((_, i) => i !== si)) || buildQual([sheets[si]]);
+    S.imp = { file:file.name, sheets, si, mode:null, months:{}, addNew:true, qual, deactivate: mx >= 0, onlyKnown:false };
+    try{ const P0 = parseMatrix(sheets[si].rows); if(P0.isLong && S.emps.length){ S.imp.addNew = false; S.imp.onlyKnown = S.types.length > 0; } } catch{} // Qualification record: зөвхөн бүртгэлтэй ажилтан
     parseCurrent(); renderImport();
   } catch(e){ console.error(e); closeModal(); toast(e.message || String(e), 'bad'); }
 }
@@ -1939,6 +1950,8 @@ function renderImport(){
     ${im.qual ? `<p class="note">Хамрагдсан огноо, хүчинтэй хугацааг <b>${esc(im.qual.sheet)}</b> sheet-ээс тулгаж авлаа (${pl.fromQual} бичлэг).${pl.typeFix.length ? ` ${pl.typeFix.length} сургалтын хүчинтэй хугацаа засагдана.` : ''}</p>` : ''}
     ${pl.newDepts.length ? `<p class="note">Шинэ алба үүснэ: ${pl.newDepts.map(esc).join(', ')}</p>` : ''}
     ${pl.deact.length ? `<label class="check"><input type="checkbox" data-imp="deactivate" ${im.deactivate ? 'checked' : ''}>Файлд байхгүй <b>${pl.deact.length}</b> ажилтныг "ажлаас гарсан" болгох</label>` : ''}
+    ${P.isLong && P.older ? `<p class="note" style="margin:0">Хүн × сургалт бүрээс <b>хамгийн сүүлийн</b> бичлэгийг авсан (${P.older} хуучин бичлэгийг алгассан).</p>` : ''}
+    ${P.isLong ? `<label class="check"><input type="checkbox" data-imp="onlyKnown" ${im.onlyKnown ? 'checked' : ''}>Зөвхөн системд байгаа ${S.types.length} сургалтын төрлийг шинэчлэх${pl.skipTypes.size ? ` <span class="muted">(${pl.skipTypes.size} өөр сургалтыг алгасна)</span>` : ''}</label>` : ''}
     <label class="check"><input type="checkbox" data-imp="addNew" ${im.addNew ? 'checked' : ''}>Системд байхгүй ажилтныг шинээр нэмэх</label>
     ${pl.errors.length ? `<details class="hist"><summary style="color:var(--bad)">${pl.errors.length} анхааруулга</summary><pre class="code" style="margin-top:6px;max-height:180px;overflow:auto;white-space:pre-wrap">${esc(pl.errors.join('\n'))}</pre></details>` : ''}
     <div class="m-foot"><button class="btn" data-act="close">Болих</button><button class="btn btn-primary" data-act="imp-apply" ${pl.recNew.length + pl.empNew.length + pl.empUpd.length + pl.mgrLinks.length + pl.typeFix.length + (im.deactivate ? pl.deact.length : 0) ? '' : 'disabled'}>Оруулах</button></div>`;
@@ -2172,6 +2185,7 @@ document.addEventListener('change', async ev => {
     if(k === 'mode') S.imp.mode = t.value;
     if(k === 'addNew') S.imp.addNew = t.checked;
     if(k === 'deactivate') S.imp.deactivate = t.checked;
+    if(k === 'onlyKnown') S.imp.onlyKnown = t.checked;
     if(k === 'months'){ const v = Number(t.value); if(v > 0) S.imp.months[t.dataset.k] = v; }
     renderImport();
   }
