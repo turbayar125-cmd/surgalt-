@@ -1573,13 +1573,13 @@ function viewSettings(){
   </div></section>
   <section class="panel" id="import"><div class="panel-head"><h2>Excel матриц оруулах</h2><span class="last-imp">${lastImportText()}</span></div><div class="panel-body" style="display:flex;flex-direction:column;gap:14px">
     <div class="drop" data-drop>
-      <b>Qualification record (.xlsx) файлаа энд чирж оруулна</b>
+      <b>All training matrix (.xlsx) файлаа энд чирж оруулна</b>
       <span class="note" style="max-width:560px">Долоо хоног бүр шинэчилсэн файлаа оруулахад шинэ сургалтууд нэмэгдэж, ажилтны мэдээлэл шинэчлэгдэнэ. Аль хэдийн байгаа бичлэг давхардахгүй. Оруулахаас өмнө юу өөрчлөгдөхийг урьдчилан харуулна.</span>
       ${importBtn('Файл сонгох', 'btn btn-primary')}
     </div>
     <details class="hist"><summary>Ямар хэлбэрийн файл уншдаг вэ?</summary>
       <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
-        <p class="note"><b>Qualification record (үндсэн)</b>: Worker, Employee ID, Program, Completion Date, Expiration Date баганатай. Хүн × сургалт бүрээс хамгийн сүүлд хамрагдсан бичлэгийг авч, <b>зөвхөн бүртгэлтэй ажилтнуудыг</b> шинэчилнэ. Ажилтны нэр, алба, идэвхтэй эсэхийг өөрчлөхгүй.</p>
+        <p class="note"><b>Qualification record (нэмэлт сонголт)</b>: Worker, Employee ID, Program, Completion Date, Expiration Date баганатай. Хүн × сургалт бүрээс хамгийн сүүлд хамрагдсан бичлэгийг авч, <b>зөвхөн бүртгэлтэй ажилтнуудыг</b> шинэчилнэ. Ажилтны нэр, алба, идэвхтэй эсэхийг өөрчлөхгүй.</p>
         <p class="note"><b>1. Матриц</b> — мөр бүр ажилтан, багана бүр сургалт, нүдэнд огноо. Хамрагдсан эсвэл дуусах огноо эсэхийг оруулахдаа сонгоно.</p>
         <pre class="code">Код  | Овог нэр   | Алба | Албан тушаал | Галын аюулгүй байдал | Анхны тусламж
 E001 | Б.Батбаяр  | BP   | Оператор     | 2026.03.15           | 2025.11.02</pre>
