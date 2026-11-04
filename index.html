@@ -490,7 +490,7 @@ const CONFIG = {
 const DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
 const sb = (!DEMO && window.supabase) ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY) : null;
 
-const APP_VER = '2026.11.05';
+const APP_VER = '2026.11.05b';
 const TABLES = { news_posts:'news', booking_items:'bitems', training_bookings:'books', departments:'depts', employees:'emps', training_types:'types', trainings:'trs', reminder_log:'logs', org_nodes:'nodes' };
 const S = {
   ready:false, auth:null, user:null, view:'dash',
@@ -686,7 +686,7 @@ async function fetchAll(table){
   return out;
 }
 async function loadAll(){
-  if(DEMO){ S.extra = true; seedDemo(); S.imports = []; S.nodes = []; S.books = []; S.bitems = []; S.biMark = true; S.hasBook = true; S.news = []; S.hasNews = true; S.hasLicFlag = true; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
+  if(DEMO){ S.extra = true; seedDemo(); S.imports = []; S.nodes = []; S.books = []; S.bitems = []; S.biMark = true; S.licLog = []; S.hasBook = true; S.news = []; S.hasNews = true; S.hasLicFlag = true; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
   const [d,e,t,tr] = await Promise.all(['departments','employees','training_types','trainings'].map(fetchAll));
   const l = await sb.from('reminder_log').select('*').order('sent_at',{ascending:false}).limit(2000);
   const s = await sb.from('settings').select('*').eq('id',1).maybeSingle();
@@ -705,6 +705,7 @@ async function loadAll(){
   S.books = [];
   { const t = await sb.from('training_types').select('is_license').limit(1); S.hasLicFlag = !t.error; }
   try{ S.nodes = await fetchAll('org_nodes'); } catch(e){ console.warn('org_nodes:', e.message); S.nodes = []; }
+  { const l = await sb.from('license_mail_log').select('*').order('sent_at', { ascending:false }).limit(20); S.licLog = l.error ? null : l.data; }
   const il = await sb.from('import_log').select('id,at,file,by_email,summary,data,undone_at').order('at', { ascending:false }).limit(15);
   S.imports = il.error ? [] : il.data;
   try{ const n = await restorePhotos(); if(n) setTimeout(() => toast(`${n} ажилтны зургийг сэргээлээ`), 600); } catch(e){ console.warn(e); }
@@ -1210,7 +1211,7 @@ function viewLic(){
   const holders = new Set(all.map(c => c.employee_id)).size;
   const tile = (cls, lbl, val, sub, st) => `<button class="tile ${cls}" data-act="lic-f" data-st="${st}"><span class="t-lbl">${lbl}</span><span class="t-num">${val}</span><span class="t-sub">${sub}</span></button>`;
   return `<div class="page-head"><div><h1>Монгол улсын эрхийн үнэмлэх</h1><p>${types.length} төрлийн үнэмлэх · ${holders} ажилтанд ${all.length} үнэмлэх</p></div>
-    <div class="actions">${S.admin ? '<button class="btn" data-act="lic-types">Үнэмлэхийн төрөл сонгох</button>' : ''}<button class="btn" data-act="lic-export">CSV экспорт</button></div></div>
+    <div class="actions">${S.admin ? '<button class="btn" data-act="lic-mailgo">Имэйл тохиргоо</button>' : ''}${S.admin ? '<button class="btn" data-act="lic-types">Үнэмлэхийн төрөл сонгох</button>' : ''}<button class="btn" data-act="lic-export">CSV экспорт</button></div></div>
   <div class="tiles">
     ${tile('ok','Хүчинтэй', n.ok, `Нийт ${all.length}-аас ${all.length ? Math.round(n.ok/all.length*100) : 0}%`, 'ok')}
     ${tile('warn',`${warnDays()} хоногт дуусах`, n.warn, 'Сунгалтад бэлдэх', 'warn')}
@@ -1227,6 +1228,31 @@ function viewLic(){
     <select class="inp" data-filter="lf" data-key="status" aria-label="Төлөв"><option value="">Бүх төлөв</option>${['bad','warn','ok'].map(s => `<option value="${s}" ${f.status===s?'selected':''}>${ST[s]}</option>`).join('')}</select>
   </div>
   <div id="list">${listLic()}</div>`;
+}
+const WEEK = ['Унтраах','Даваа','Мягмар','Лхагва','Пүрэв','Баасан','Бямба','Ням'];
+const licCfg = () => ({ cc:S.settings.lic_cc ?? 'hse@premiumconcrete.mn, leadteam@premiumconcrete.mn', days:S.settings.lic_days ?? 60, wd:S.settings.lic_weekday ?? 1 });
+function licDigest(){
+  const c = licCfg(), tset = new Set(licTypes().map(t => t.id)), cc = c.cc.split(',').map(x => x.trim()).filter(Boolean);
+  return sortedDepts().map(d => { const items = activeCurrent().filter(x => tset.has(x.training_type_id) && IDX.emp.get(x.employee_id).department_id === d.id && x.days <= c.days).sort((a, b) => a.days - b.days);
+    const to = d.email ? [d.email] : cc.slice(0, 1); return { d, items, to, cc:cc.filter(x => !to.includes(x)), bad:items.filter(x => x.days < 0).length }; });
+}
+function licMailPanel(){
+  const c = licCfg(), dg = licDigest(), ready = 'lic_cc' in S.settings || DEMO;
+  return `<section class="panel" id="lic-mail"><div class="panel-head"><h2>Эрхийн үнэмлэхийн автомат имэйл</h2><span class="note">${c.wd ? `Долоо хоног бүрийн ${WEEK[c.wd]} 09:00` : 'Унтраалттай'}</span></div><div class="panel-body" style="display:flex;flex-direction:column;gap:12px">
+    ${ready ? '' : '<p class="note" style="color:var(--bad)">Идэвхжүүлэхийн тулд шинэ setup.sql-ийг Supabase дээр ажиллуулна уу.</p>'}
+    <p class="note">Алба бүрт тухайн албаны хугацаа нь <b>дууссан</b> болон <b>${c.days} хоногт дуусах</b> үнэмлэхүүдийн жагсаалтыг илгээнэ. Мэдээлэх зүйлгүй албанд илгээхгүй. Имэйлгүй алба CC-ийн эхний хаяг руу очно.</p>
+    <form data-form="lic-mail" style="display:flex;flex-direction:column;gap:10px">
+      <div class="grid2"><div class="field"><label for="lm-wd">Илгээх өдөр</label><select class="inp" id="lm-wd" name="wd">${WEEK.map((w, i) => `<option value="${i}" ${c.wd === i ? 'selected' : ''}>${w}</option>`).join('')}</select></div>
+        <div class="field"><label for="lm-days">Хэдэн хоногийн дотор дуусахыг оруулах</label><input class="inp mono" id="lm-days" name="days" type="number" min="0" value="${c.days}"></div></div>
+      <div class="field"><label for="lm-cc">CC (таслалаар)</label><input class="inp" id="lm-cc" name="cc" value="${esc(c.cc)}"></div>
+      <div class="m-foot" style="justify-content:flex-start"><button class="btn btn-primary" type="submit">Хадгалах</button></div></form>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Алба</th><th>To (албаны имэйл)</th><th class="num">Дууссан</th><th class="num">Дөхсөн</th><th></th></tr></thead><tbody>
+      ${dg.map(x => `<tr><td><b>${esc(x.d.name)}</b></td><td><input class="inp" style="min-width:230px" type="email" value="${esc(x.d.email||'')}" placeholder="${esc(x.to[0] ? x.to[0] + ' (CC-ээс)' : '')}" data-edit="dept-email" data-id="${x.d.id}" aria-label="${esc(x.d.name)} имэйл"></td>
+        <td class="num" style="color:var(--bad)">${x.bad || ''}</td><td class="num" style="color:var(--warn)">${x.items.length - x.bad || ''}</td><td class="num">${x.items.length ? `<button class="btn btn-sm" data-act="lic-prev" data-id="${x.d.id}">Харах</button>` : '<span class="faint">илгээхгүй</span>'}</td></tr>`).join('')}
+    </tbody></table></div>
+    <div class="sec-head"><span class="note">Нийт ${dg.filter(x => x.items.length).length} албанд илгээгдэнэ.</span><button class="btn" data-act="lic-send">Одоо илгээх</button></div>
+    ${S.licLog?.length ? `<details class="hist"><summary>Илгээсэн түүх</summary><div class="tbl-wrap" style="margin-top:6px"><table class="tbl"><thead><tr><th>Огноо</th><th>Алба</th><th>To</th><th class="num">Мөр</th></tr></thead><tbody>${S.licLog.map(l => `<tr><td class="mono">${fmtDate(String(l.sent_at).slice(0,10))} ${new Date(l.sent_at).toTimeString().slice(0,5)}</td><td>${esc(l.dept_name)}</td><td>${esc((l.recipients?.to || []).join(', '))}</td><td class="num">${l.items}</td></tr>`).join('')}</tbody></table></div></details>` : ''}
+  </div></section>`;
 }
 function filteredLic(){
   const f = S.lf, q = f.q.trim().toLowerCase(), tset = new Set(licTypes().map(t => t.id));
@@ -1601,6 +1627,7 @@ function viewSettings(){
       <form data-form="add-type" class="set-row" style="margin-top:6px"><input class="inp" id="nt-name" name="name" placeholder="Шинэ сургалт" required><input class="inp mono" id="nt-m" name="months" type="number" min="1" value="12" aria-label="Сар"><button class="btn btn-sm" type="submit">Нэмэх</button></form>
     </div></section>
   </div>
+  ${licMailPanel()}
   <section class="panel"><div class="panel-head"><h2>Админ эрхтэй хүмүүс</h2><span class="chip chip-plain">${S.admins.length}</span></div><div class="panel-body" style="display:flex;flex-direction:column;gap:10px">
     <p class="note">Энд бүртгэлтэй имэйлээр нэвтэрсэн хүн мэдээлэл засна. Бусад нэвтэрсэн хүн <b>зөвхөн харна</b>. Шинэ хүнд нэвтрэх эрх өгөхдөө Supabase → Authentication → Users → <b>Add user</b> хэсгээс үүсгэнэ.</p>
     ${S.admins.map(a => `<div class="set-row two"><span>${esc(a.email)}${a.email === (S.user?.email||'').toLowerCase() ? ' <span class="muted">(та)</span>' : ''}</span>${a.email === (S.user?.email||'').toLowerCase() || S.admins.length < 2 ? '<span></span>' : `<button class="btn btn-sm btn-danger" data-act="del-admin" data-email="${esc(a.email)}">Хасах</button>`}</div>`).join('')}
@@ -2176,6 +2203,15 @@ const ACT = {
   'del-admin': async a => { const em = a.dataset.email; if(!await askConfirm(`${em}-ийн админ эрхийг хасах уу? Тэр зөвхөн харах эрхтэй болно.`, 'Хасах')) return;
     await run(async () => { if(!DEMO){ const { error } = await sb.from('app_admins').delete().eq('email', em); if(error) throw error; } S.admins = S.admins.filter(x => x.email !== em); render(); }, 'Эрх хасагдлаа'); },
   'bp-apply': a => applyBulkPhotos(a),
+  'lic-mailgo': () => { S.view = 'settings'; render(); $('#lic-mail')?.scrollIntoView(); },
+  'lic-prev': a => { const x = licDigest().find(g => g.d.id === Number(a.dataset.id)); if(!x) return; const c = licCfg();
+    openModal({ title:`[${x.d.name}] Эрхийн үнэмлэх: ${x.bad} дууссан, ${x.items.length - x.bad} дуусах дөхсөн`, wide:true, body:`<div class="mail"><div class="mail-h"><span>To</span><b style="font-weight:500">${esc(x.to.join(', ') || '—')}</b><span>CC</span><b style="font-weight:500">${esc(x.cc.join(', ') || '—')}</b></div>
+      <div class="mail-b"><p>Сайн байна уу,</p><p><b>${esc(x.d.name)}</b> албаны Монгол улсын эрхийн үнэмлэхүүдээс хугацаа нь <b>дууссан ${x.bad}</b>, ойрын ${c.days} хоногт <b>дуусах ${x.items.length - x.bad}</b> байна. Сунгалтыг цаг тухайд нь зохион байгуулна уу.</p>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ажилтан</th><th>SAP</th><th>Албан тушаал</th><th>Үнэмлэх</th><th>Дугаар</th><th>Дуусах</th><th>Төлөв</th></tr></thead><tbody>${x.items.map(i => { const e = IDX.emp.get(i.employee_id); return `<tr><td>${esc(e.full_name)}</td><td class="mono">${esc(e.emp_code||'')}</td><td>${esc(e.position||'')}</td><td>${esc(typeName(i.training_type_id))}</td><td class="mono">${esc(i.certificate_no||'—')}</td><td class="mono">${fmtDate(i.expires_on)}</td><td>${chip(i.status, daysText(i.days))}</td></tr>`; }).join('')}</tbody></table></div></div></div>` }); },
+  'lic-send': async a => { const n = licDigest().filter(x => x.items.length).length; if(!n) return toast('Илгээх зүйл алга');
+    if(!await askConfirm(`${n} албанд эрхийн үнэмлэхийн мэдэгдэл одоо илгээх үү?`, 'Илгээх')) return;
+    a.disabled = true; const r = await run(async () => { if(DEMO) return n; const { data, error } = await sb.rpc('send_license_digest', { force:true }); if(error) throw error;
+      const l = await sb.from('license_mail_log').select('*').order('sent_at', { ascending:false }).limit(20); if(!l.error) S.licLog = l.data; return data; }, k => DEMO ? `Демо: ${k} албанд илгээгдэх байсан` : `${k} албанд илгээлээ`); a.disabled = false; if(r != null) render(); },
   'news-new': () => openModal({ title:'Мэдээ нийтлэх', wide:true, body:newsForm(null) }),
   'news-edit': a => { const n = S.news.find(x => x.id === Number(a.dataset.id)); if(n) openModal({ title:'Мэдээ засах', wide:true, body:newsForm(n) }); },
   'news-del': async a => { if(!await askConfirm('Энэ мэдээг устгах уу?')) return; await run(() => dbDelete('news_posts', Number(a.dataset.id)), 'Устгагдлаа'); render(); },
@@ -2242,7 +2278,7 @@ const ACT = {
     Object.assign(S, { ready:false, auth:'login', user:null, admin:false, admins:[], imports:[], depts:[], emps:[], trs:[], types:[], logs:[], view:'dash', org:null });
     closeModal(); document.body.classList.remove('ro'); render(); toast('Системээс гарлаа'); }
 };
-const ADMIN_ACTS = new Set(['news-new','news-edit','news-del','lic-types','bk-new','bk-item','bk-set','bk-rm','bk-cancel','bk-done','bim-apply','bp-apply','undo-imp','wipe-all','new-emp','edit-emp','del-emp','new-tr','edit-tr','renew','del-tr','bulk','bulk-all','send-now','del-dept','del-type','pick-photo','imp-apply','del-admin']);
+const ADMIN_ACTS = new Set(['lic-send','lic-prev','news-new','news-edit','news-del','lic-types','bk-new','bk-item','bk-set','bk-rm','bk-cancel','bk-done','bim-apply','bp-apply','undo-imp','wipe-all','new-emp','edit-emp','del-emp','new-tr','edit-tr','renew','del-tr','bulk','bulk-all','send-now','del-dept','del-type','pick-photo','imp-apply','del-admin']);
 const denied = () => { toast('Танд засах эрх алга. Админтай холбогдоно уу.','bad'); };
 document.addEventListener('click', ev => { const a = ev.target.closest('[data-act]'); if(!a) return; if(!S.admin && ADMIN_ACTS.has(a.dataset.act)){ ev.preventDefault(); return denied(); } const f = ACT[a.dataset.act]; if(f){ if(a.tagName === 'A') ev.preventDefault(); f(a, ev); } });
 document.addEventListener('keydown', ev => {
@@ -2292,6 +2328,7 @@ document.addEventListener('change', async ev => {
   }
   if(t.dataset.edit){
     const id = Number(t.dataset.id), v = t.value.trim();
+    if(t.dataset.edit === 'dept-email') await run(async () => { await dbUpdate('departments', id, { email:v || null }); render(); }, 'Имэйл хадгалагдлаа');
     if(t.dataset.edit === 'dept' && v) await run(async () => { await dbUpdate('departments', id, { name:v }); }, 'Хадгалагдлаа');
     if(t.dataset.edit === 'type-name' && v) await run(async () => { await dbUpdate('training_types', id, { name:v }); }, 'Хадгалагдлаа');
     if(t.dataset.edit === 'type-months' && Number(v) > 0) await run(async () => { await dbUpdate('training_types', id, { validity_months:Number(v) }); }, 'Хадгалагдлаа. Шинэ бичлэгт хэрэглэгдэнэ');
@@ -2343,6 +2380,7 @@ const FORMS = {
     const r = await run(async () => { const yes = all.filter(x => on.has(x.id)); const n = await bkMakeTrainings(yes, d);
       for(const x of all) await dbUpdate('booking_items', x.id, { status:on.has(x.id) ? 'done' : 'noshow' }); return n; }, n => `${on.size} хүн явагдсан, ${n} сургалтын бичлэг үүслээ`);
     if(r != null){ closeModal(); render(); } },
+  'lic-mail': async f => { const r = await run(() => saveSettings({ lic_weekday:Number(f.wd.value), lic_days:Math.max(0, Number(f.days.value) || 0), lic_cc:f.cc.value.trim() }), 'Хадгалагдлаа'); render(); },
   news: async f => { const id = num(f.id.value), btn = f.querySelector('button[type=submit]'); btn.disabled = true;
     const r = await run(async () => { const row = { title:f.title.value.trim(), body:f.body.value.trim() || null, category:f.category.value, pinned:f.pinned.checked, link_url:f.link_url.value.trim() || null };
       if(f.image.files[0]) row.image_url = await uploadNewsImage(f.image.files[0]); else if(f.rmimg?.checked) row.image_url = null;
