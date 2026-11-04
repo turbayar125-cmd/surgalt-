@@ -438,3 +438,43 @@ grant execute on function public.send_license_digest(boolean) to authenticated;
 
 do $$ begin perform cron.unschedule('license-digest'); exception when others then null; end $$;
 select cron.schedule('license-digest', '0 1 * * *', 'select public.send_license_digest()');
+
+-- =====================================================================
+--  Албаны имэйлээр нэвтэрсэн хэрэглэгч зөвхөн өөрийн албыг харна
+--  (departments.email = нэвтэрсэн имэйл, админ биш бол)
+-- =====================================================================
+create or replace function public.my_dept() returns bigint
+language sql stable security definer set search_path = public as $$
+  select d.id from public.departments d
+  where nullif(trim(d.email), '') is not null and lower(trim(d.email)) = lower(coalesce(auth.jwt() ->> 'email', ''))
+    and not public.is_admin()
+  order by d.id limit 1;
+$$;
+create or replace function public.can_see_emp(eid bigint) returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.my_dept() is null or exists (select 1 from public.employees e where e.id = eid and e.department_id = public.my_dept());
+$$;
+revoke all on function public.my_dept() from public, anon;
+revoke all on function public.can_see_emp(bigint) from public, anon;
+grant execute on function public.my_dept() to authenticated;
+grant execute on function public.can_see_emp(bigint) to authenticated;
+
+drop policy if exists "read_all" on public.employees;
+drop policy if exists "read_scoped" on public.employees;
+create policy "read_scoped" on public.employees for select to authenticated using (public.my_dept() is null or department_id = public.my_dept());
+
+drop policy if exists "read_all" on public.trainings;
+drop policy if exists "read_scoped" on public.trainings;
+create policy "read_scoped" on public.trainings for select to authenticated using (public.can_see_emp(employee_id));
+
+drop policy if exists "read_all" on public.booking_items;
+drop policy if exists "read_scoped" on public.booking_items;
+create policy "read_scoped" on public.booking_items for select to authenticated
+  using (public.my_dept() is null or (employee_id is not null and public.can_see_emp(employee_id)));
+
+drop policy if exists "org_read" on public.org_nodes;
+drop policy if exists "org_write" on public.org_nodes;
+create policy "org_read"  on public.org_nodes for select to authenticated using (public.my_dept() is null or department_id = public.my_dept());
+create policy "org_write" on public.org_nodes for all    to authenticated
+  using (public.my_dept() is null or department_id = public.my_dept())
+  with check (public.my_dept() is null or department_id = public.my_dept());

@@ -490,7 +490,7 @@ const CONFIG = {
 const DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
 const sb = (!DEMO && window.supabase) ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY) : null;
 
-const APP_VER = '2026.11.05b';
+const APP_VER = '2026.11.05c';
 const TABLES = { news_posts:'news', booking_items:'bitems', training_bookings:'books', departments:'depts', employees:'emps', training_types:'types', trainings:'trs', reminder_log:'logs', org_nodes:'nodes' };
 const S = {
   ready:false, auth:null, user:null, view:'dash',
@@ -697,6 +697,8 @@ async function loadAll(){
   // is_admin функц байхгүй (шинэ setup.sql ажиллуулаагүй) бол хуучин горимоор бүгд засна
   S.admin = r.error ? /is_admin|function|schema cache/i.test(r.error.message||'') : !!r.data;
   S.admins = [];
+  { const m = S.admin ? { data:null } : await sb.rpc('my_dept'); S.myDept = m.error ? null : (m.data ?? null); }
+  if(S.myDept){ S.depts = S.depts.filter(d => d.id === S.myDept); S.view = S.view === 'org' ? 'org' : S.view; } // албаны данс: зөвхөн өөрийн алба
   if(S.admin){ const a = await sb.from('app_admins').select('*').order('added_at'); if(!a.error) S.admins = a.data; }
   { const t = await sb.from('employees').select('roster,poi').limit(1); S.extra = !t.error; }
   try{ S.news = await fetchAll('news_posts'); S.hasNews = true; } catch(e){ console.warn('news:', e.message); S.news = []; S.hasNews = false; }
@@ -876,9 +878,9 @@ function render(){
     <aside class="side">
       <div class="brand"><img class="brand-logo" src="logo-dark.png" alt="Premium"><img class="brand-mark-img" src="logo-mark.png" alt="Premium"><span class="brand-app">Сургалтын бүртгэл</span></div>
       <nav class="nav" aria-label="Цэс">${nav.map(([k,l]) => `<button data-act="nav" data-v="${k}" ${S.view===k?'aria-current="page"':''}>${I[k]}<span class="lbl">${l}</span>${k==='trs'&&bad?`<span class="badge">${bad}</span>`:''}${k==='news'&&newsUnread()?`<span class="badge" style="background:#3d7be0">${newsUnread()}</span>`:''}</button>`).join('')}</nav>
-      <div class="side-foot"><span class="faint" style="font-size:11px">Хувилбар ${APP_VER}</span>${DEMO ? '<span>Демо горим</span>' : `<span class="role ${S.admin?'adm':'view'}">${S.admin?'Админ':'Зөвхөн харах'}</span><span class="who-email">${esc(S.user?.email||'')}</span><button class="logout" data-act="logout" title="Системээс гарах" aria-label="Системээс гарах">${I.out}<span class="lbl">Системээс гарах</span></button>`}</div>
+      <div class="side-foot"><span class="faint" style="font-size:11px">Хувилбар ${APP_VER}</span>${DEMO ? '<span>Демо горим</span>' : `<span class="role ${S.admin?'adm':'view'}">${S.admin?'Админ':S.myDept?esc(deptName(S.myDept))+' алба':'Зөвхөн харах'}</span><span class="who-email">${esc(S.user?.email||'')}</span><button class="logout" data-act="logout" title="Системээс гарах" aria-label="Системээс гарах">${I.out}<span class="lbl">Системээс гарах</span></button>`}</div>
     </aside>
-    <main class="main"><div class="wrap">${DEMO ? demoBar() : ''}${!DEMO && !S.admin ? '<div class="ro-note">Танд <b>зөвхөн харах</b> эрх байна (Алба цэсний бүтцийг засах боломжтой). Бусад мэдээлэл засах бол админтай холбогдоно уу: <a href="mailto:Turbayar.O@premiumconcrete.mn?subject=%D0%A1%D1%83%D1%80%D0%B3%D0%B0%D0%BB%D1%82%D1%82%D0%B0%D0%B9%20%D1%85%D0%BE%D0%BB%D0%B1%D0%BE%D0%BE%D1%82%D0%BE%D0%B9%20%D1%85%D2%AF%D1%81%D1%8D%D0%BB%D1%82"><b>Turbayar.O@premiumconcrete.mn</b></a></div>' : ''}${VIEWS[S.view]()}</div></main>
+    <main class="main"><div class="wrap">${DEMO ? demoBar() : ''}${S.myDept ? `<div class="ro-note" style="background:var(--accent-soft);color:var(--accent)">Та зөвхөн <b>${esc(deptName(S.myDept))}</b> албаны мэдээллийг харж байна.</div>` : ''}${!DEMO && !S.admin ? '<div class="ro-note">Танд <b>зөвхөн харах</b> эрх байна (Алба цэсний бүтцийг засах боломжтой). Бусад мэдээлэл засах бол админтай холбогдоно уу: <a href="mailto:Turbayar.O@premiumconcrete.mn?subject=%D0%A1%D1%83%D1%80%D0%B3%D0%B0%D0%BB%D1%82%D1%82%D0%B0%D0%B9%20%D1%85%D0%BE%D0%BB%D0%B1%D0%BE%D0%BE%D1%82%D0%BE%D0%B9%20%D1%85%D2%AF%D1%81%D1%8D%D0%BB%D1%82"><b>Turbayar.O@premiumconcrete.mn</b></a></div>' : ''}${VIEWS[S.view]()}</div></main>
   </div>`;
   // org chart: дээд удирдлагыг дэлгэцийн голд гаргана
   $$('.org-scroll,.org-canvas').forEach(el => { const h = el.querySelector('.onode.head,.obox.root'); if(!h) return; const a = el.getBoundingClientRect(), b = h.getBoundingClientRect(); el.scrollLeft += (b.left + b.width/2) - (a.left + a.width/2); });
@@ -1007,6 +1009,7 @@ function orgChart(deptId, edit){
 }
 
 function viewOrg(){
+  if(S.myDept && IDX.dept.has(S.myDept)) return viewTeam(S.myDept);
   if(S.org && IDX.dept.has(S.org)) return viewTeam(S.org);
   const noDept = S.emps.filter(e => e.active && !IDX.dept.has(e.department_id)).length;
   const cards = sortedDepts().map(d => {
@@ -1035,7 +1038,7 @@ function viewTeam(deptId){
   const placed = placedIds(), pool = members.filter(e => !placed.has(e.id)).sort((a, b) => (a.position||'').localeCompare(b.position||'') || a.full_name.localeCompare(b.full_name));
   const has = deptNodes(deptId).length, tpl = tplFor(d);
   const tile = (cls, lbl, val, sub, stv) => `<button class="tile ${cls}" data-act="goto-trs" data-st="${stv}" data-dept="${deptId}"><span class="t-lbl">${lbl}</span><span class="t-num">${val}</span><span class="t-sub">${sub}</span></button>`;
-  return `<div class="page-head"><div class="org-head"><button class="btn btn-sm" data-act="org-back">${I.back}Бүх алба</button><div><h1>${esc(d.name)}</h1><p>${members.length} идэвхтэй ажилтан · ${members.length - pool.length} нь бүтцэд байрласан</p></div></div>
+  return `<div class="page-head"><div class="org-head">${S.myDept ? '' : `<button class="btn btn-sm" data-act="org-back">${I.back}Бүх алба</button>`}<div><h1>${esc(d.name)}</h1><p>${members.length} идэвхтэй ажилтан · ${members.length - pool.length} нь бүтцэд байрласан</p></div></div>
     <div class="actions"><button class="btn" data-act="goto-emps" data-dept="${deptId}">Жагсаалтаар харах</button>${S.admin ? `<button class="btn btn-primary" data-act="new-emp" data-dept="${deptId}">+ Ажилтан нэмэх</button>` : ''}</div></div>
   <div class="tiles">
     ${tile('ok','Хүчинтэй сургалт', st.c.ok, `Нийт ${st.tot}-аас ${st.pct}%`, 'ok')}
