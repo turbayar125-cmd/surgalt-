@@ -476,6 +476,7 @@ const CONFIG = {
 const DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
 const sb = (!DEMO && window.supabase) ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY) : null;
 
+const APP_VER = '2026.11.05';
 const TABLES = { news_posts:'news', booking_items:'bitems', training_bookings:'books', departments:'depts', employees:'emps', training_types:'types', trainings:'trs', reminder_log:'logs', org_nodes:'nodes' };
 const S = {
   ready:false, auth:null, user:null, view:'dash',
@@ -859,7 +860,7 @@ function render(){
     <aside class="side">
       <div class="brand"><img class="brand-logo" src="logo-dark.png" alt="Premium"><img class="brand-mark-img" src="logo-mark.png" alt="Premium"><span class="brand-app">Сургалтын бүртгэл</span></div>
       <nav class="nav" aria-label="Цэс">${nav.map(([k,l]) => `<button data-act="nav" data-v="${k}" ${S.view===k?'aria-current="page"':''}>${I[k]}<span class="lbl">${l}</span>${k==='trs'&&bad?`<span class="badge">${bad}</span>`:''}${k==='news'&&newsUnread()?`<span class="badge" style="background:#3d7be0">${newsUnread()}</span>`:''}</button>`).join('')}</nav>
-      <div class="side-foot">${DEMO ? '<span>Демо горим</span>' : `<span class="role ${S.admin?'adm':'view'}">${S.admin?'Админ':'Зөвхөн харах'}</span><span class="who-email">${esc(S.user?.email||'')}</span><button class="logout" data-act="logout" title="Системээс гарах" aria-label="Системээс гарах">${I.out}<span class="lbl">Системээс гарах</span></button>`}</div>
+      <div class="side-foot"><span class="faint" style="font-size:11px">Хувилбар ${APP_VER}</span>${DEMO ? '<span>Демо горим</span>' : `<span class="role ${S.admin?'adm':'view'}">${S.admin?'Админ':'Зөвхөн харах'}</span><span class="who-email">${esc(S.user?.email||'')}</span><button class="logout" data-act="logout" title="Системээс гарах" aria-label="Системээс гарах">${I.out}<span class="lbl">Системээс гарах</span></button>`}</div>
     </aside>
     <main class="main"><div class="wrap">${DEMO ? demoBar() : ''}${!DEMO && !S.admin ? '<div class="ro-note">Танд <b>зөвхөн харах</b> эрх байна (Алба цэсний бүтцийг засах боломжтой). Бусад мэдээлэл засах бол админтай холбогдоно уу: <a href="mailto:Turbayar.O@premiumconcrete.mn?subject=%D0%A1%D1%83%D1%80%D0%B3%D0%B0%D0%BB%D1%82%D1%82%D0%B0%D0%B9%20%D1%85%D0%BE%D0%BB%D0%B1%D0%BE%D0%BE%D1%82%D0%BE%D0%B9%20%D1%85%D2%AF%D1%81%D1%8D%D0%BB%D1%82"><b>Turbayar.O@premiumconcrete.mn</b></a></div>' : ''}${VIEWS[S.view]()}</div></main>
   </div>`;
