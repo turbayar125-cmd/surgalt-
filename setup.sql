@@ -56,6 +56,7 @@ create table if not exists public.trainings (
   created_at       timestamptz not null default now(),
   check (expires_on >= completed_on)
 );
+alter table public.trainings add column if not exists proof_url text;  -- гэрчилгээ / үнэмлэхний зураг эсвэл PDF
 create index if not exists trainings_emp_type_idx on public.trainings(employee_id, training_type_id, expires_on desc);
 
 create table if not exists public.reminder_log (

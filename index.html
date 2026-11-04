@@ -189,6 +189,10 @@ button.mk{cursor:pointer;font-size:12px;padding:3px 10px}
 .tbl tr.is-new td{background:#eefbf3} .tbl tr.is-chg td{background:#fff9e6}
 :root[data-theme="dark"] .bk-p.is-new,:root[data-theme="dark"] .tbl tr.is-new td{background:#123222} :root[data-theme="dark"] .bk-p.is-chg,:root[data-theme="dark"] .tbl tr.is-chg td{background:#33290f}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .bk-p.is-new,:root:not([data-theme="light"]) .tbl tr.is-new td{background:#123222} :root:not([data-theme="light"]) .bk-p.is-chg,:root:not([data-theme="light"]) .tbl tr.is-chg td{background:#33290f}}
+.proof{display:inline-block;width:46px;height:34px;border-radius:6px;overflow:hidden;border:1px solid var(--line);vertical-align:middle;background:var(--surface-2)}
+.proof img{width:100%;height:100%;object-fit:cover;display:block}
+.proof.pdf{width:auto;height:auto;padding:4px 8px;font-size:12px;font-weight:600;text-decoration:none;color:var(--accent)}
+.proof-cur{display:flex;gap:12px;align-items:center;margin-bottom:6px}
 .news-list{display:flex;flex-direction:column;gap:14px;max-width:860px}
 .news{overflow:hidden} .news.pinned{border-color:var(--warn)}
 .news-img{display:block;width:100%;max-height:360px;object-fit:cover;background:var(--surface-2)}
@@ -490,7 +494,7 @@ const CONFIG = {
 const DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
 const sb = (!DEMO && window.supabase) ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY) : null;
 
-const APP_VER = '2026.11.05d';
+const APP_VER = '2026.11.05e';
 const TABLES = { news_posts:'news', booking_items:'bitems', training_bookings:'books', departments:'depts', employees:'emps', training_types:'types', trainings:'trs', reminder_log:'logs', org_nodes:'nodes' };
 const S = {
   ready:false, auth:null, user:null, view:'dash',
@@ -532,7 +536,7 @@ const warnDays = () => { const d = S.settings.reminder_days || []; return d.leng
 const statusOf = d => d < 0 ? 'bad' : d <= warnDays() ? 'warn' : 'ok';
 const ST = { ok:'Хүчинтэй', warn:'Дуусах дөхсөн', bad:'Хугацаа дууссан', none:'Сургалтгүй' };
 const chip = (st, txt) => `<span class="chip chip-${st}">${esc(txt ?? ST[st])}</span>`;
-function daysText(d){ if(d < 0) return `${-d} хоног хэтэрсэн`; if(d === 0) return 'Өнөөдөр дуусна'; return `${d} хоног үлдсэн`; }
+function daysText(d){ if(d > 3650) return 'Хугацаагүй'; if(d < 0) return `${-d} хоног хэтэрсэн`; if(d === 0) return 'Өнөөдөр дуусна'; return `${d} хоног үлдсэн`; }
 
 function reindex(){
   IDX.dept = new Map(S.depts.map(d => [d.id, d]));
@@ -686,7 +690,7 @@ async function fetchAll(table){
   return out;
 }
 async function loadAll(){
-  if(DEMO){ S.extra = true; seedDemo(); S.imports = []; S.nodes = []; S.books = []; S.bitems = []; S.biMark = true; S.licLog = []; S.hasBook = true; S.news = []; S.hasNews = true; S.hasLicFlag = true; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
+  if(DEMO){ S.extra = true; seedDemo(); S.imports = []; S.nodes = []; S.books = []; S.bitems = []; S.biMark = true; S.licLog = []; S.hasProof = true; S.hasBook = true; S.news = []; S.hasNews = true; S.hasLicFlag = true; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
   const [d,e,t,tr] = await Promise.all(['departments','employees','training_types','trainings'].map(fetchAll));
   const l = await sb.from('reminder_log').select('*').order('sent_at',{ascending:false}).limit(2000);
   const s = await sb.from('settings').select('*').eq('id',1).maybeSingle();
@@ -708,6 +712,7 @@ async function loadAll(){
   try{ S.bitems = await fetchAll('booking_items'); S.hasBook = true; } catch(e){ console.warn('booking_items:', e.message); S.bitems = []; S.hasBook = false; }
   S.books = [];
   { const t = await sb.from('training_types').select('is_license').limit(1); S.hasLicFlag = !t.error; }
+  { const t = await sb.from('trainings').select('proof_url').limit(1); S.hasProof = !t.error; }
   try{ S.nodes = await fetchAll('org_nodes'); } catch(e){ console.warn('org_nodes:', e.message); S.nodes = []; }
   { const l = await sb.from('license_mail_log').select('*').order('sent_at', { ascending:false }).limit(20); S.licLog = l.error ? null : l.data; }
   const il = await sb.from('import_log').select('id,at,file,by_email,summary,data,undone_at').order('at', { ascending:false }).limit(15);
@@ -1216,7 +1221,7 @@ function viewLic(){
   const holders = new Set(all.map(c => c.employee_id)).size;
   const tile = (cls, lbl, val, sub, st) => `<button class="tile ${cls}" data-act="lic-f" data-st="${st}"><span class="t-lbl">${lbl}</span><span class="t-num">${val}</span><span class="t-sub">${sub}</span></button>`;
   return `<div class="page-head"><div><h1>Монгол улсын эрхийн үнэмлэх</h1><p>${types.length} төрлийн үнэмлэх · ${holders} ажилтанд ${all.length} үнэмлэх</p></div>
-    <div class="actions">${S.admin ? '<button class="btn" data-act="lic-mailgo">Имэйл тохиргоо</button>' : ''}${S.admin ? '<button class="btn" data-act="lic-types">Үнэмлэхийн төрөл сонгох</button>' : ''}<button class="btn" data-act="lic-export">CSV экспорт</button></div></div>
+    <div class="actions">${S.admin ? '<button class="btn btn-primary" data-act="lic-add">+ Үнэмлэх нэмэх</button><button class="btn" data-act="lic-mailgo">Имэйл тохиргоо</button>' : ''}${S.admin ? '<button class="btn" data-act="lic-types">Үнэмлэхийн төрөл сонгох</button>' : ''}<button class="btn" data-act="lic-export">CSV экспорт</button></div></div>
   <div class="tiles">
     ${tile('ok','Хүчинтэй', n.ok, `Нийт ${all.length}-аас ${all.length ? Math.round(n.ok/all.length*100) : 0}%`, 'ok')}
     ${tile('warn',`${warnDays()} хоногт дуусах`, n.warn, 'Сунгалтад бэлдэх', 'warn')}
@@ -1270,11 +1275,11 @@ function filteredLic(){
 function listLic(){
   const l = filteredLic();
   if(!l.length) return `<div class="panel empty">Тохирох үнэмлэх олдсонгүй.</div>`;
-  return `<p class="count">${l.length} үнэмлэх</p><div class="panel tbl-wrap"><table class="tbl"><thead><tr><th>Ажилтан</th><th>Үнэмлэх</th><th>Дугаар</th><th>Олгосон</th><th>Дуусах</th><th>Төлөв</th><th></th></tr></thead><tbody>
+  return `<p class="count">${l.length} үнэмлэх</p><div class="panel tbl-wrap"><table class="tbl"><thead><tr><th>Ажилтан</th><th>Үнэмлэх</th><th>Дугаар</th><th>Олгосон</th><th>Дуусах</th><th>Төлөв</th><th>Баталгаа</th><th></th></tr></thead><tbody>
   ${l.map(c => { const e = IDX.emp.get(c.employee_id); return `<tr>
     <td><button class="who btn-link" data-act="profile" data-id="${e.id}" style="color:inherit">${avatar(e,'sm')}<span style="text-align:left"><b style="font-weight:500">${esc(e.full_name)}</b><br><span class="p-sub">${esc(deptName(e.department_id))} · ${esc(e.position||'')}</span></span></button></td>
     <td>${esc(typeName(c.training_type_id))}</td><td class="mono">${esc(c.certificate_no||'—')}</td><td class="mono">${fmtDate(c.completed_on)}</td><td class="mono">${fmtDate(c.expires_on)}</td>
-    <td>${chip(c.status, daysText(c.days))}</td><td class="num">${S.admin ? `<button class="btn btn-sm" data-act="edit-tr" data-id="${c.id}">Засах</button> <button class="btn btn-sm" data-act="renew" data-id="${c.id}">Сунгах</button>` : ''}</td></tr>`; }).join('')}
+    <td>${chip(c.status, daysText(c.days))}</td><td>${c.proof_url ? proofThumb(c.proof_url) : '<span class="faint">—</span>'}</td><td class="num">${S.admin ? `<button class="btn btn-sm" data-act="lic-edit" data-id="${c.id}">Засах</button> <button class="btn btn-sm" data-act="lic-renew" data-id="${c.id}">Сунгах</button>` : ''}</td></tr>`; }).join('')}
   </tbody></table></div>`;
 }
 
@@ -1702,10 +1707,22 @@ function profileBody(id){
   <div class="tr-list">${cur.length ? cur.map(c => trCard(c, true)).join('') : '<div class="empty">Сургалт бүртгэгдээгүй байна.</div>'}</div>
   ${old.length ? `<details class="hist"><summary>Өмнөх бичлэгүүд (${old.length})</summary><div class="tr-list" style="margin-top:8px">${old.map(t => trCard(t, false)).join('')}</div></details>` : ''}`;
 }
+const isPdf = u => /\.pdf(\?|$)/i.test(u || '');
+const proofThumb = u => isPdf(u) ? `<a class="proof pdf" href="${esc(u)}" target="_blank" rel="noopener" title="Баталгаажуулах файл">📄 PDF</a>` : `<a class="proof" href="${esc(u)}" target="_blank" rel="noopener" title="Баталгаажуулах зураг"><img src="${esc(u)}" alt="" loading="lazy"></a>`;
+async function uploadProof(trId, file){
+  if(DEMO) return URL.createObjectURL(file);
+  if(file.size > 10 * 1024 * 1024) throw new Error('Файл 10 MB-аас бага байх ёстой');
+  let blob = file, ext = 'pdf', type = 'application/pdf';
+  if(!/pdf$/i.test(file.type) && !/\.pdf$/i.test(file.name)){ ext = 'jpg'; type = 'image/jpeg';
+    blob = await new Promise((res, rej) => { const u = URL.createObjectURL(file), img = new Image(); img.onload = () => { const k = Math.min(1, 1800 / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u); c.toBlob(b => b ? res(b) : rej(new Error('Зураг уншиж чадсангүй')), 'image/jpeg', .85); }; img.onerror = () => rej(new Error('Зургийн формат танигдсангүй')); img.src = u; }); }
+  const path = `proof-${trId}-${Date.now()}.${ext}`;
+  const { error } = await sb.storage.from('photos').upload(path, blob, { contentType:type, upsert:false }); if(error) throw error;
+  return sb.storage.from('photos').getPublicUrl(path).data.publicUrl;
+}
 function trCard(t, isCur){
   return `<div class="tr-card"><div style="min-width:0"><div class="tr-name">${esc(typeName(t.training_type_id))}</div>
     <div class="tr-meta"><span>Хамрагдсан <span class="mono">${fmtDate(t.completed_on)}</span></span><span>Дуусах <span class="mono">${fmtDate(t.expires_on)}</span></span>${t.certificate_no?`<span>№ <span class="mono">${esc(t.certificate_no)}</span></span>`:''}${t.provider?`<span>${esc(t.provider)}</span>`:''}</div>
-    ${t.notes?`<div class="tr-meta">${esc(t.notes)}</div>`:''}</div>
+    ${t.notes?`<div class="tr-meta">${esc(t.notes)}</div>`:''}${t.proof_url ? `<div style="margin-top:6px">${proofThumb(t.proof_url)}</div>` : ''}</div>
     <div>${isCur ? chip(t.status, daysText(t.days)) : chip('plain','Өмнөх')}</div>
     <div class="tr-act">${isCur?`<button class="btn btn-sm" data-act="renew" data-id="${t.id}">Сунгах</button>`:''}<button class="btn btn-sm" data-act="edit-tr" data-id="${t.id}">Засах</button><button class="btn btn-sm btn-danger" data-act="del-tr" data-id="${t.id}">Устгах</button></div></div>`;
 }
@@ -1736,27 +1753,33 @@ function empForm(e, deptId){
     <label class="check"><input type="checkbox" name="active" id="f-act" ${e.active?'checked':''}>Идэвхтэй ажиллаж байгаа</label>
     <div class="m-foot"><button class="btn" type="button" data-act="${e.id?'back-profile':'close'}" data-id="${e.id||''}">Болих</button><button class="btn btn-primary" type="submit">Хадгалах</button></div></form>`;
 }
-function trForm(t){
-  const types = sortedTypes(); const tt = IDX.type.get(t.training_type_id) || types[0];
+function trForm(t, opt = {}){
+  const types = opt.lic ? licTypes() : sortedTypes(); const tt = IDX.type.get(t.training_type_id) || types[0];
   const done = t.completed_on || todayStr();
   const exp = t.expires_on || (tt ? addMonths(done, tt.validity_months) : done);
   const e = IDX.emp.get(t.employee_id);
-  return `<form data-form="training" style="display:flex;flex-direction:column;gap:12px"><input type="hidden" name="id" value="${t.id||''}"><input type="hidden" name="employee_id" value="${t.employee_id}">
-    <div style="display:flex;gap:10px;align-items:center">${avatar(e,'sm')}<b style="font-weight:500">${esc(e.full_name)}</b><span class="muted">${esc(deptName(e.department_id))}</span></div>
-    <div class="field"><label for="t-type">Сургалт</label><select class="inp" id="t-type" name="training_type_id" required>${types.map(x => `<option value="${x.id}" data-m="${x.validity_months}" ${tt&&x.id===tt.id?'selected':''}>${esc(x.name)} · ${x.validity_months} сар</option>`).join('')}</select></div>
+  const empSel = `<div class="field"><label for="t-emp">Ажилтан</label><input class="inp" id="t-empq" type="search" placeholder="Нэр, SAP-аар хайх" data-empq aria-label="Ажилтан хайх" style="margin-bottom:6px">
+    <select class="inp" id="t-emp" name="employee_id" required size="6">${S.emps.filter(x => x.active).sort((a, b) => a.full_name.localeCompare(b.full_name)).map(x => `<option value="${x.id}" data-s="${esc((x.full_name + ' ' + (x.emp_code||'')).toLowerCase())}">${esc(x.full_name)} · ${esc(deptName(x.department_id))}${x.emp_code ? ' · ' + esc(x.emp_code) : ''}</option>`).join('')}</select></div>`;
+  return `<form data-form="training" style="display:flex;flex-direction:column;gap:12px"><input type="hidden" name="id" value="${t.id||''}"><input type="hidden" name="back" value="${opt.lic ? 'lic' : 'profile'}">
+    ${e ? `<input type="hidden" name="employee_id" value="${t.employee_id}"><div style="display:flex;gap:10px;align-items:center">${avatar(e,'sm')}<b style="font-weight:500">${esc(e.full_name)}</b><span class="muted">${esc(deptName(e.department_id))}</span></div>` : empSel}
+    ${opt.lic && !types.length ? '<p class="note" style="color:var(--bad)">Үнэмлэхийн төрөл алга. "Үнэмлэхийн төрөл сонгох"-оос эхлээд тохируулна уу.</p>' : ''}
+    <div class="field"><label for="t-type">Сургалт</label><select class="inp" id="t-type" name="training_type_id" required>${types.map(x => `<option value="${x.id}" data-m="${x.validity_months}" ${tt&&x.id===tt.id?'selected':''}>${esc(x.name)} · ${x.validity_months >= 600 ? 'хугацаагүй' : x.validity_months + ' сар'}</option>`).join('')}</select></div>
     <div class="grid2"><div class="field"><label for="t-done">Хамрагдсан огноо</label><input class="inp mono" id="t-done" type="date" name="completed_on" required value="${done}"></div>
       <div class="field"><label for="t-exp">Дуусах огноо</label><input class="inp mono" id="t-exp" type="date" name="expires_on" required value="${exp}"></div></div>
     <div class="grid2"><div class="field"><label for="t-cert">Гэрчилгээ №</label><input class="inp mono" id="t-cert" name="certificate_no" value="${esc(t.certificate_no||'')}"></div>
       <div class="field"><label for="t-prov">Сургалт явуулсан байгууллага</label><input class="inp" id="t-prov" name="provider" value="${esc(t.provider||'')}"></div></div>
     <div class="field"><label for="t-notes">Тэмдэглэл</label><textarea class="inp" id="t-notes" name="notes">${esc(t.notes||'')}</textarea></div>
-    <div class="m-foot"><button class="btn" type="button" data-act="back-profile" data-id="${t.employee_id}">Болих</button><button class="btn btn-primary" type="submit">Хадгалах</button></div></form>`;
+    ${S.hasProof ? `<div class="field"><label for="t-proof">Баталгаажуулах зураг / PDF (гэрчилгээ, үнэмлэх)</label>
+      ${t.proof_url ? `<div class="proof-cur">${proofThumb(t.proof_url)}<label class="check"><input type="checkbox" name="rmproof">Хасах</label></div>` : ''}
+      <input class="inp" id="t-proof" name="proof" type="file" accept="image/*,application/pdf"><p class="note">Утсаар зураг авч эсвэл скан хийсэн файлаа оруулна. Зургийг автоматаар жижигрүүлнэ.</p></div>` : ''}
+    <div class="m-foot"><button class="btn" type="button" data-act="${opt.lic || !e ? 'close' : 'back-profile'}" data-id="${t.employee_id||''}">Болих</button><button class="btn btn-primary" type="submit">Хадгалах</button></div></form>`;
 }
 function bulkForm(){
   const types = sortedTypes(); const done = todayStr(); const tt = types[0];
   const emps = S.emps.filter(e => e.active).sort((a,b) => a.full_name.localeCompare(b.full_name,'mn'));
   return `<form data-form="bulk" style="display:flex;flex-direction:column;gap:12px">
     <p class="note" style="margin:0">Нэг сургалтад олон хүн хамт хамрагдсан бол нэг дор бүртгэнэ.</p>
-    <div class="grid2"><div class="field"><label for="b-type">Сургалт</label><select class="inp" id="b-type" name="training_type_id" required>${types.map(x => `<option value="${x.id}" data-m="${x.validity_months}">${esc(x.name)} · ${x.validity_months} сар</option>`).join('')}</select></div>
+    <div class="grid2"><div class="field"><label for="b-type">Сургалт</label><select class="inp" id="b-type" name="training_type_id" required>${types.map(x => `<option value="${x.id}" data-m="${x.validity_months}">${esc(x.name)} · ${x.validity_months >= 600 ? 'хугацаагүй' : x.validity_months + ' сар'}</option>`).join('')}</select></div>
       <div class="field"><label for="b-prov">Сургалт явуулсан байгууллага</label><input class="inp" id="b-prov" name="provider"></div></div>
     <div class="grid2"><div class="field"><label for="b-done">Хамрагдсан огноо</label><input class="inp mono" id="b-done" type="date" name="completed_on" required value="${done}"></div>
       <div class="field"><label for="b-exp">Дуусах огноо</label><input class="inp mono" id="b-exp" type="date" name="expires_on" required value="${tt?addMonths(done, tt.validity_months):done}"></div></div>
@@ -2210,6 +2233,10 @@ const ACT = {
   'del-admin': async a => { const em = a.dataset.email; if(!await askConfirm(`${em}-ийн админ эрхийг хасах уу? Тэр зөвхөн харах эрхтэй болно.`, 'Хасах')) return;
     await run(async () => { if(!DEMO){ const { error } = await sb.from('app_admins').delete().eq('email', em); if(error) throw error; } S.admins = S.admins.filter(x => x.email !== em); render(); }, 'Эрх хасагдлаа'); },
   'bp-apply': a => applyBulkPhotos(a),
+  'lic-add': () => { S.openEmp = null; openModal({ title:'Үнэмлэх нэмэх', wide:true, body:trForm({}, { lic:true }) }); },
+  'lic-edit': a => { const t = S.trs.find(x => x.id === Number(a.dataset.id)); S.openEmp = null; openModal({ title:'Үнэмлэх засах', wide:true, body:trForm(t, { lic:true }) }); },
+  'lic-renew': a => { const t = S.trs.find(x => x.id === Number(a.dataset.id)); const tt = IDX.type.get(t.training_type_id); const d = todayStr(); S.openEmp = null;
+    openModal({ title:'Үнэмлэх сунгах', wide:true, body:`<p class="note" style="margin:0">Шинэ бичлэг үүснэ. Өмнөх нь түүхэнд хадгалагдана.</p>`+trForm({ employee_id:t.employee_id, training_type_id:t.training_type_id, completed_on:d, expires_on:addMonths(d, tt.validity_months), provider:t.provider }, { lic:true }) }); },
   'lic-mailgo': () => { S.view = 'settings'; render(); $('#lic-mail')?.scrollIntoView(); },
   'lic-prev': a => { const x = licDigest().find(g => g.d.id === Number(a.dataset.id)); if(!x) return; const c = licCfg();
     openModal({ title:`[${x.d.name}] Эрхийн үнэмлэх: ${x.bad} дууссан, ${x.items.length - x.bad} дуусах дөхсөн`, wide:true, body:`<div class="mail"><div class="mail-h"><span>From</span><b style="font-weight:500">${esc(c.from)}</b>${c.reply ? `<span>Reply-To</span><b style="font-weight:500">${esc(c.reply)}</b>` : ''}<span>To</span><b style="font-weight:500">${esc(x.to.join(', ') || '—')}</b><span>CC</span><b style="font-weight:500">${esc(x.cc.join(', ') || '—')}</b></div>
@@ -2285,7 +2312,7 @@ const ACT = {
     Object.assign(S, { ready:false, auth:'login', user:null, admin:false, admins:[], imports:[], depts:[], emps:[], trs:[], types:[], logs:[], view:'dash', org:null });
     closeModal(); document.body.classList.remove('ro'); render(); toast('Системээс гарлаа'); }
 };
-const ADMIN_ACTS = new Set(['lic-send','lic-prev','news-new','news-edit','news-del','lic-types','bk-new','bk-item','bk-set','bk-rm','bk-cancel','bk-done','bim-apply','bp-apply','undo-imp','wipe-all','new-emp','edit-emp','del-emp','new-tr','edit-tr','renew','del-tr','bulk','bulk-all','send-now','del-dept','del-type','pick-photo','imp-apply','del-admin']);
+const ADMIN_ACTS = new Set(['lic-add','lic-edit','lic-renew','lic-send','lic-prev','news-new','news-edit','news-del','lic-types','bk-new','bk-item','bk-set','bk-rm','bk-cancel','bk-done','bim-apply','bp-apply','undo-imp','wipe-all','new-emp','edit-emp','del-emp','new-tr','edit-tr','renew','del-tr','bulk','bulk-all','send-now','del-dept','del-type','pick-photo','imp-apply','del-admin']);
 const denied = () => { toast('Танд засах эрх алга. Админтай холбогдоно уу.','bad'); };
 document.addEventListener('click', ev => { const a = ev.target.closest('[data-act]'); if(!a) return; if(!S.admin && ADMIN_ACTS.has(a.dataset.act)){ ev.preventDefault(); return denied(); } const f = ACT[a.dataset.act]; if(f){ if(a.tagName === 'A') ev.preventDefault(); f(a, ev); } });
 document.addEventListener('keydown', ev => {
@@ -2304,6 +2331,7 @@ document.addEventListener('input', ev => {
   const t = ev.target;
   if(t.dataset.filter){ const o = S[t.dataset.filter]; o[t.dataset.key] = t.type === 'checkbox' ? t.checked : t.value; $('#list').innerHTML = t.dataset.filter === 'ef' ? listEmps() : t.dataset.filter === 'lf' ? listLic() : listTrs(); }
   if(t.dataset.bv !== undefined && S.bv){ S.bv[t.dataset.bv] = t.value; if(t.dataset.bv === 'q'){ $('#bk-body').innerHTML = S.bv.view === 'due' ? bkDueView(dueList()) : S.bv.view === 'dept' ? bkDeptView(bkFiltered()) : S.bv.view === 'type' ? bkTypeView(bkFiltered()) : bkDayView(bkFiltered()); } else render(); }
+  if('empq' in t.dataset){ const q = t.value.trim().toLowerCase(), sel = $('#t-emp'); let first = null; [...sel.options].forEach(o => { o.hidden = !!q && !o.dataset.s.includes(q); if(!o.hidden && !first) first = o; }); if(first && (!sel.value || sel.selectedOptions[0]?.hidden)) sel.value = first.value; }
   if('nf' in t.dataset && S.nf){ S.nf.q = t.value; const f = S.nf, q = f.q.trim().toLowerCase(); $('#news-list').innerHTML = [...S.news].filter(n => (!f.cat || n.category === f.cat) && (!q || (n.title + ' ' + (n.body||'')).toLowerCase().includes(q))).sort((a, b) => (b.pinned - a.pinned) || b.created_at.localeCompare(a.created_at)).map(newsCard).join('') || '<div class="panel empty">Тохирох мэдээ алга.</div>'; }
   if('bkt' in t.dataset){ const ch = new Set($$('#bk-pick input:checked').map(i => Number(i.value))); $('#bk-pick').innerHTML = bkPick(Number(t.value), ch); const q = $('#b-q'); if(q) q.dispatchEvent(new Event('input', { bubbles:true })); }
   if(t.dataset.bulk){ const q = $('#b-q').value.trim().toLowerCase(), d = $('#b-dept').value; $$('.pick-list label').forEach(l => l.hidden = (d && l.dataset.dept !== d) || (q && !l.dataset.s.includes(q))); }
@@ -2357,8 +2385,13 @@ const FORMS = {
     const id = num(f.id.value), emp = Number(f.employee_id.value);
     if(f.expires_on.value < f.completed_on.value) return toast('Дуусах огноо хамрагдсан огнооноос өмнө байна','bad');
     const row = { employee_id:emp, training_type_id:Number(f.training_type_id.value), completed_on:f.completed_on.value, expires_on:f.expires_on.value, certificate_no:f.certificate_no.value.trim()||null, provider:f.provider.value.trim()||null, notes:f.notes.value.trim()||null };
-    const r = await run(() => id ? dbUpdate('trainings', id, row) : dbInsert('trainings', row), 'Сургалт хадгалагдлаа');
-    if(r){ render(); openProfile(emp); }
+    if(!emp) return toast('Ажилтан сонгоно уу','bad');
+    const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+    const r = await run(async () => { const tr = id ? await dbUpdate('trainings', id, row) : await dbInsert('trainings', row);
+      if(f.proof?.files[0]) return dbUpdate('trainings', tr.id, { proof_url:await uploadProof(tr.id, f.proof.files[0]) });
+      if(f.rmproof?.checked) return dbUpdate('trainings', tr.id, { proof_url:null }); return tr; }, 'Хадгалагдлаа');
+    btn.disabled = false;
+    if(r){ if(f.back.value === 'lic'){ closeModal(); render(); } else { render(); openProfile(emp); } }
   },
   bulk: async f => {
     const ids = $$('input[name=emp]:checked', f).map(i => Number(i.value)); if(!ids.length) return toast('Ажилтан сонгоно уу','bad');
