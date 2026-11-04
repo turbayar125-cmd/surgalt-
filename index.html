@@ -176,6 +176,19 @@ textarea.inp{resize:vertical;min-height:70px}
 .chip-acc{background:var(--accent-soft);color:var(--accent)}
 .bk-list{display:flex;flex-direction:column;gap:10px}
 .bk-days{display:flex;flex-direction:column;gap:14px}
+.mk{display:inline-flex;align-items:center;font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;line-height:18px;white-space:nowrap;flex:none;border:1px solid transparent;cursor:default}
+button.mk{cursor:pointer;font-size:12px;padding:3px 10px}
+.mk-new{background:#d8f5e3;color:#13703f;border-color:#9ddcb5} .mk-chg{background:#fff1c7;color:#8a5a00;border-color:#f0d27a}
+.mk.on{box-shadow:0 0 0 2px currentColor}
+.mk-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+.bk-p.is-new{background:#eefbf3;border-color:#5cc488;box-shadow:inset 3px 0 0 #22a55b}
+.bk-p.is-chg{background:#fff9e6;border-color:#e8bd45;box-shadow:inset 3px 0 0 #e0a100}
+.bk-p .mk{margin-left:auto} .bk-p .mk + .bk-st,.bk-p .mk + .bk-x{margin-left:4px}
+.mk-why{color:#8a5a00}
+.bk-s.has-new{border-color:#9ddcb5} .bk-s.has-chg{border-color:#f0d27a}
+.tbl tr.is-new td{background:#eefbf3} .tbl tr.is-chg td{background:#fff9e6}
+:root[data-theme="dark"] .bk-p.is-new,:root[data-theme="dark"] .tbl tr.is-new td{background:#123222} :root[data-theme="dark"] .bk-p.is-chg,:root[data-theme="dark"] .tbl tr.is-chg td{background:#33290f}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .bk-p.is-new,:root:not([data-theme="light"]) .tbl tr.is-new td{background:#123222} :root:not([data-theme="light"]) .bk-p.is-chg,:root:not([data-theme="light"]) .tbl tr.is-chg td{background:#33290f}}
 .news-list{display:flex;flex-direction:column;gap:14px;max-width:860px}
 .news{overflow:hidden} .news.pinned{border-color:var(--warn)}
 .news-img{display:block;width:100%;max-height:360px;object-fit:cover;background:var(--surface-2)}
@@ -194,7 +207,8 @@ textarea.inp{resize:vertical;min-height:70px}
 .bk-sess{display:flex;flex-direction:column;gap:12px}
 .bk-s{border:1px solid var(--line-2);border-radius:10px;padding:12px 14px;background:var(--surface)}
 .bk-sh{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-bottom:10px}
-.bk-ppl{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px}
+.bk-ppl{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px}
+.bk-p.is-chg{grid-column:span 2}
 .bk-p{display:flex;gap:8px;align-items:center;border:1px solid var(--line-2);border-radius:9px;padding:5px 8px;background:var(--surface);position:relative;min-width:0;cursor:pointer}
 .bk-p:hover{border-color:var(--accent)}
 .bk-p.cancelled,.bk-p.noshow{opacity:.55} .bk-p.cancelled .bk-pn b{text-decoration:line-through}
@@ -672,7 +686,7 @@ async function fetchAll(table){
   return out;
 }
 async function loadAll(){
-  if(DEMO){ S.extra = true; seedDemo(); S.imports = []; S.nodes = []; S.books = []; S.bitems = []; S.hasBook = true; S.news = []; S.hasNews = true; S.hasLicFlag = true; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
+  if(DEMO){ S.extra = true; seedDemo(); S.imports = []; S.nodes = []; S.books = []; S.bitems = []; S.biMark = true; S.hasBook = true; S.news = []; S.hasNews = true; S.hasLicFlag = true; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
   const [d,e,t,tr] = await Promise.all(['departments','employees','training_types','trainings'].map(fetchAll));
   const l = await sb.from('reminder_log').select('*').order('sent_at',{ascending:false}).limit(2000);
   const s = await sb.from('settings').select('*').eq('id',1).maybeSingle();
@@ -686,6 +700,7 @@ async function loadAll(){
   if(S.admin){ const a = await sb.from('app_admins').select('*').order('added_at'); if(!a.error) S.admins = a.data; }
   { const t = await sb.from('employees').select('roster,poi').limit(1); S.extra = !t.error; }
   try{ S.news = await fetchAll('news_posts'); S.hasNews = true; } catch(e){ console.warn('news:', e.message); S.news = []; S.hasNews = false; }
+  { const t = await sb.from('booking_items').select('added_at,changed_at,changes').limit(1); S.biMark = !t.error; }
   try{ S.bitems = await fetchAll('booking_items'); S.hasBook = true; } catch(e){ console.warn('booking_items:', e.message); S.bitems = []; S.hasBook = false; }
   S.books = [];
   { const t = await sb.from('training_types').select('is_license').limit(1); S.hasLicFlag = !t.error; }
@@ -1247,7 +1262,7 @@ function dueList(){
 }
 function bkFiltered(){
   const v = S.bv, q = v.q.trim().toLowerCase();
-  return S.bitems.filter(b => (!v.month || b.month === v.month) && (!v.dept || biDept(b) === v.dept) && (!v.status || b.status === v.status)
+  return S.bitems.filter(b => (!v.only || (v.only === 'new' ? biIsNew(b) : biIsChg(b))) && (!v.month || b.month === v.month) && (!v.dept || biDept(b) === v.dept) && (!v.status || b.status === v.status)
     && (!q || (biName(b) + ' ' + (b.emp_code||'') + ' ' + biType(b) + ' ' + (b.location||'')).toLowerCase().includes(q)));
 }
 function viewBook(){
@@ -1283,6 +1298,8 @@ function viewBook(){
     <input class="inp search" type="search" data-bv="q" value="${esc(v.q)}" placeholder="Нэр, САП, сургалт, байршил" aria-label="Хайх">
     <span style="display:flex;gap:6px;flex-wrap:wrap">${tab('day','Өдрөөр')}${tab('dept','Албаар')}${tab('type','Сургалтаар')}<button class="btn btn-sm ${v.view === 'due' ? 'btn-primary' : ''}" data-act="bk-view" data-v="due">Захиалга хэрэгтэй <span class="badge-n">${due.reduce((s, g) => s + g.ids.length, 0)}</span></button></span>
   </div>
+  ${(() => { const nN = S.bitems.filter(biIsNew).length, nC = S.bitems.filter(biIsChg).length; return lastBookAt() && (nN || nC) ? `<div class="mk-bar"><span>Сүүлийн файлаар (${fmtDate(String(lastBookAt()).slice(0,10))} ${new Date(lastBookAt()).toTimeString().slice(0,5)}):</span>
+      <button class="mk mk-new ${v.only === 'new' ? 'on' : ''}" data-act="bk-only" data-o="new">+${nN} шинэ</button><button class="mk mk-chg ${v.only === 'chg' ? 'on' : ''}" data-act="bk-only" data-o="chg">${nC} өөрчлөгдсөн</button>${v.only ? '<button class="btn-link" data-act="bk-only" data-o="">Бүгдийг харуулах</button>' : '<span class="faint">дарж зөвхөн тэднийг харна</span>'}</div>` : ''; })()}
   <div id="bk-body">${body}</div>
 `;
 }
@@ -1308,15 +1325,23 @@ function bkGroups(list){ // нэг сургалт, нэг цаг, нэг газ�
   return [...m.values()].sort((a, b) => (a[0].start_time || '99').localeCompare(b[0].start_time || '99') || biType(a[0]).localeCompare(biType(b[0])));
 }
 const deptChips = list => { const c = {}; list.forEach(b => { const d = biDept(b); c[d] = (c[d] || 0) + 1; }); return Object.entries(c).sort((a, b) => b[1] - a[1]).map(([d, n]) => `<span class="chip chip-plain">${esc(d)} ${n}</span>`).join(''); };
+const lastBookAt = () => S.settings.last_book?.at || null;
+const biIsNew = b => !!b.added_at && b.added_at === lastBookAt();
+const biIsChg = b => !biIsNew(b) && !!b.changed_at && b.changed_at === lastBookAt() && b.changes && Object.keys(b.changes).length;
+const BI_F = { start_on:'Огноо', end_on:'Дуусах огноо', start_time:'Эхлэх цаг', end_time:'Дуусах цаг', location:'Байршил', room:'Анги', status:'Төлөв', process:'Захиалга', training_name:'Сургалт', kind:'Төрөл', note:'Тайлбар' };
+const fmtVal = (k, v) => v == null || v === '' ? '—' : k === 'status' ? (BK[v]?.[0] || v) : /_on$/.test(k) ? fmtDate(v) : String(v);
+const biChgText = b => biIsChg(b) ? Object.entries(b.changes).map(([k, [o, n]]) => `${BI_F[k] || k}: ${fmtVal(k, o)} → ${fmtVal(k, n)}`).join('\n') : '';
+const markCls = b => biIsNew(b) ? 'is-new' : biIsChg(b) ? 'is-chg' : '';
+const markTag = b => biIsNew(b) ? '<span class="mk mk-new">Шинэ</span>' : biIsChg(b) ? `<span class="mk mk-chg" title="${esc(biChgText(b))}">Өөрчлөгдсөн</span>` : '';
 function personChip(b){
   const e = b.employee_id && IDX.emp.get(b.employee_id), [l, c] = BK[b.status] || BK.planned;
-  return `<span class="bk-p ${b.status}" ${e ? `data-act="profile" data-id="${e.id}"` : ''} title="${esc(biName(b))} · ${esc(b.position || '')} · ${l}${b.kind ? ' · ' + esc(b.kind) : ''}${b.note ? ' · ' + esc(b.note) : ''}">
-    ${e ? avatar(e, 'sm') : `<span class="av av-sm av-ini" style="--h:210">${esc(initials(b.full_name))}</span>`}<span class="bk-pn"><b>${esc(biName(b))}</b><small>${esc(biDept(b))}${b.kind ? ' · ' + esc(b.kind) : ''}</small></span>
+  return `<span class="bk-p ${b.status} ${markCls(b)}" ${e ? `data-act="profile" data-id="${e.id}"` : ''} title="${esc(biName(b))} · ${esc(b.position || '')} · ${l}${b.kind ? ' · ' + esc(b.kind) : ''}${b.note ? ' · ' + esc(b.note) : ''}${biIsNew(b) ? '\nСүүлийн файлаар шинээр нэмэгдсэн' : ''}${biIsChg(b) ? '\nӨөрчлөгдсөн:\n' + esc(biChgText(b)) : ''}">
+    ${e ? avatar(e, 'sm') : `<span class="av av-sm av-ini" style="--h:210">${esc(initials(b.full_name))}</span>`}<span class="bk-pn"><b>${esc(biName(b))}</b><small>${biIsChg(b) ? `<span class="mk-why">${esc(Object.keys(b.changes).map(k => BI_F[k] || k).join(', '))} өөрчлөгдсөн</span>` : esc(biDept(b)) + (b.kind ? ' · ' + esc(b.kind) : '')}</small></span>${markTag(b)}
     ${b.status !== 'planned' ? `<i class="bk-st st-${c}" title="${l}"></i>` : ''}${S.admin ? `<button class="bk-x" data-act="bk-item" data-id="${b.id}" title="Төлөв өөрчлөх" aria-label="Төлөв">⋯</button>` : ''}</span>`;
 }
 function sessionCard(g){
   const b = g[0], open = g.filter(x => x.status === 'planned').length;
-  return `<div class="bk-s"><div class="bk-sh"><div style="min-width:0"><div class="bk-title">${esc(biType(b))}</div>
+  return `<div class="bk-s ${g.some(biIsNew) ? 'has-new' : g.some(biIsChg) ? 'has-chg' : ''}"><div class="bk-sh"><div style="min-width:0"><div class="bk-title">${esc(biType(b))}</div>
       <div class="bk-meta">${timeSpan(b) ? `<span>🕒 ${esc(timeSpan(b))}</span>` : ''}${b.location ? `<span>📍 ${esc(b.location)}${b.room ? ' · анги ' + esc(b.room) : ''}</span>` : ''}<span>${g.length} хүн</span>${b.end_on && b.end_on !== b.start_on ? `<span>${fmtDate(b.start_on)}–${fmtDate(b.end_on)}</span>` : ''}</div></div>
     ${S.admin && open ? `<span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm btn-primary" data-act="bk-done" data-ids="${g.map(x => x.id).join(',')}">Явагдсан</button><button class="btn btn-sm btn-danger" data-act="bk-cancel" data-ids="${g.map(x => x.id).join(',')}">Цуцлах</button></span>` : ''}</div>
     <div class="bk-ppl">${g.map(personChip).join('')}</div></div>`;
@@ -1327,7 +1352,7 @@ function bkDayView(all){
   if(!keys.length) return '<div class="panel empty">Тохирох захиалга алга.</div>';
   return `<div class="bk-days">${keys.map(k => { const l = byDay.get(k), d = k ? parseYmd(k) : null, past = k && k < today;
     return `<section class="panel bk-day ${k === today ? 'today' : ''} ${past ? 'past' : ''}"><div class="panel-head"><div class="bk-dh">${d ? `<span class="bk-date"><b>${d.getDate()}</b><span>${MON[d.getMonth()]}</span></span><span><b>${WD[d.getDay()]}</b>${k === today ? ' · <span style="color:var(--accent)">Өнөөдөр</span>' : ''}<br><span class="p-sub">${fmtDate(k)}</span></span>` : '<b>Огноо тодорхойгүй</b>'}</div>
-      <div class="chips-row" style="align-items:center"><span class="chip chip-acc">${l.length} хүн</span>${deptChips(l)}</div></div>
+      <div class="chips-row" style="align-items:center">${l.filter(biIsNew).length ? `<span class="mk mk-new">+${l.filter(biIsNew).length} шинэ</span>` : ''}${l.filter(biIsChg).length ? `<span class="mk mk-chg">${l.filter(biIsChg).length} өөрчлөгдсөн</span>` : ''}<span class="chip chip-acc">${l.length} хүн</span>${deptChips(l)}</div></div>
       <div class="panel-body bk-sess">${bkGroups(l).map(sessionCard).join('')}</div></section>`; }).join('')}</div>`;
 }
 function bkDeptView(all){
@@ -1343,7 +1368,7 @@ function bkDeptView(all){
   ${depts.map(dp => { const l = all.filter(b => biDept(b) === dp).sort((a, b) => (a.start_on || '9').localeCompare(b.start_on || '9') || biName(a).localeCompare(biName(b)));
     return `<section class="panel"><div class="panel-head"><h2>${esc(dp)}</h2><span class="chip chip-plain">${l.length} захиалга · ${new Set(l.map(b => b.employee_id || b.emp_code)).size} хүн</span></div>
       <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Огноо</th><th>Ажилтан</th><th>Сургалт</th><th>Цаг</th><th>Байршил</th><th>Төлөв</th></tr></thead><tbody>${l.map(b => { const [st, c] = BK[b.status] || BK.planned, e = b.employee_id && IDX.emp.get(b.employee_id);
-        return `<tr><td class="mono">${b.start_on ? fmtDate(b.start_on) : '<span class="faint">—</span>'}</td><td>${e ? `<button class="who btn-link" data-act="profile" data-id="${e.id}" style="color:inherit">${avatar(e,'sm')}<span>${esc(e.full_name)}</span></button>` : esc(biName(b))}</td><td>${esc(biType(b))}${b.kind ? ` <span class="faint">· ${esc(b.kind)}</span>` : ''}</td><td class="mono">${esc(timeSpan(b))}</td><td>${esc(b.location || '')}${b.room ? ` <span class="faint">#${esc(b.room)}</span>` : ''}</td><td>${chip(c, st)}</td></tr>`; }).join('')}</tbody></table></div></section>`; }).join('')}`;
+        return `<tr class="${markCls(b)}" title="${esc(biChgText(b))}"><td class="mono">${b.start_on ? fmtDate(b.start_on) : '<span class="faint">—</span>'} ${markTag(b)}</td><td>${e ? `<button class="who btn-link" data-act="profile" data-id="${e.id}" style="color:inherit">${avatar(e,'sm')}<span>${esc(e.full_name)}</span></button>` : esc(biName(b))}</td><td>${esc(biType(b))}${b.kind ? ` <span class="faint">· ${esc(b.kind)}</span>` : ''}</td><td class="mono">${esc(timeSpan(b))}</td><td>${esc(b.location || '')}${b.room ? ` <span class="faint">#${esc(b.room)}</span>` : ''}</td><td>${chip(c, st)}</td></tr>`; }).join('')}</tbody></table></div></section>`; }).join('')}`;
 }
 function bkTypeView(all){
   const by = new Map(); all.forEach(b => { const k = biType(b); if(!by.has(k)) by.set(k, []); by.get(k).push(b); });
@@ -1431,10 +1456,20 @@ function planBook(parsed){
       if(!old) out.ins.push(row);
       else { const patch = {}; for(const k of Object.keys(row)) if(String(row[k] ?? '') !== String(old[k] ?? '')) patch[k] = row[k];
         if(old.status !== 'planned' && row.status === 'planned') delete patch.status; // гараар тэмдэглэсэн төлвийг хадгална
-        if(Object.keys(patch).length) out.upd.push({ id:old.id, patch }); else out.same++; }
+        const VIS = { start_on:'Огноо', end_on:'Дуусах огноо', start_time:'Эхлэх цаг', end_time:'Дуусах цаг', location:'Байршил', room:'Анги', status:'Төлөв', process:'Захиалга', training_name:'Сургалт', kind:'Төрөл', note:'Тайлбар' };
+        const ch = {}; for(const k of Object.keys(patch)) if(VIS[k]) ch[k] = [old[k] ?? null, patch[k] ?? null];
+        if(Object.keys(patch).length) out.upd.push({ id:old.id, patch, ch }); else out.same++; }
     }
   }
   out.del = S.bitems.filter(b => b.import_key && out.months.has(b.month) && !seen.has(b.import_key) && b.status === 'planned').map(b => b.id);
+  // Огноо нь өөрчлөгдсөн мөр: хуучин түлхүүр устах гэж буй, шинэ нь ижил хүн × сургалт → шинэ биш, "өөрчлөгдсөн"
+  const pre = k => k.split('|').slice(0, 3).join('|');
+  const delBy = new Map(); for(const id of out.del){ const b = S.bitems.find(x => x.id === id); const k = pre(b.import_key); if(!delBy.has(k)) delBy.set(k, []); delBy.get(k).push(b); }
+  out.ins = out.ins.filter(row => { const l = delBy.get(pre(row.import_key)); if(!l?.length) return true; const old = l.shift();
+    const patch = {}, ch = {}; for(const k of Object.keys(row)) if(String(row[k] ?? '') !== String(old[k] ?? '')) patch[k] = row[k];
+    if(old.status !== 'planned' && row.status === 'planned') delete patch.status;
+    const VIS = ['start_on','end_on','start_time','end_time','location','room','status','process','kind','note']; for(const k of VIS) if(k in patch) ch[k] = [old[k] ?? null, patch[k] ?? null];
+    out.upd.push({ id:old.id, patch, ch }); out.del = out.del.filter(x => x !== old.id); return false; });
   return out;
 }
 async function startBookImport(file, sheets){
@@ -1462,12 +1497,12 @@ function renderBookImport(){
     <div class="m-foot"><button class="btn" data-act="close">Болих</button><button class="btn btn-primary" data-act="bim-apply" ${n ? '' : 'disabled'}>Оруулах</button></div>` });
 }
 async function applyBookImport(){
-  const im = S.bim, pl = im.plan;
-  if(pl.ins.length) await dbInsert('booking_items', pl.ins);
-  for(const u of pl.upd) await dbUpdate('booking_items', u.id, u.patch);
+  const im = S.bim, pl = im.plan, at = new Date().toISOString();
+  if(pl.ins.length) await dbInsert('booking_items', S.biMark ? pl.ins.map(r => ({ ...r, added_at:at })) : pl.ins);
+  for(const u of pl.upd) await dbUpdate('booking_items', u.id, S.biMark && Object.keys(u.ch).length ? { ...u.patch, changed_at:at, changes:u.ch } : u.patch);
   if(im.delMissing && pl.del.length) await dbDeleteMany('booking_items', pl.del);
   const sheets = [...im.pick].join(', ');
-  try{ await saveSettings({ last_book:{ at:new Date().toISOString(), file:im.file, sheets } }); } catch{ S.settings.last_book = { at:new Date().toISOString(), file:im.file, sheets }; }
+  try{ await saveSettings({ last_book:{ at, file:im.file, sheets } }); } catch{ S.settings.last_book = { at, file:im.file, sheets }; }
   S.bv = { month:[...pl.months].sort().pop() || '', view:'day', dept:'', status:'', q:'' };
   return { ins:pl.ins.length, upd:pl.upd.length, del:im.delMissing ? pl.del.length : 0 };
 }
@@ -2158,6 +2193,7 @@ const ACT = {
   'bk-new': (a, ev) => { ev?.preventDefault(); S.openEmp = null; const tid = a.dataset.type ? Number(a.dataset.type) : undefined; const due = a.dataset.ids ? a.dataset.ids.split(',').map(Number) : tid ? (dueList().find(g => g.tid === tid)?.ids || []) : [];
     openModal({ title:'Сургалт захиалах', wide:true, body:bkForm(tid, due) }); },
   'bk-view': a => { S.bv.view = a.dataset.v; render(); },
+  'bk-only': a => { S.bv.only = a.dataset.o; if(S.bv.view === 'due') S.bv.view = 'day'; render(); },
   'bk-dept': a => { S.bv.dept = a.dataset.d; render(); },
   'bk-item': (a, ev) => { ev.stopPropagation(); const b = S.bitems.find(x => x.id === Number(a.dataset.id)); if(!b) return;
     openModal({ title:biName(b), body:`<p class="note" style="margin:0">${esc(biType(b))} · ${b.start_on ? fmtDate(b.start_on) : 'огноогүй'} ${esc(timeSpan(b))}</p>

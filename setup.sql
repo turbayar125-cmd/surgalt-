@@ -140,6 +140,10 @@ create table if not exists public.booking_items (
 );
 create unique index if not exists booking_items_key on public.booking_items(import_key) where import_key is not null;
 create index if not exists booking_items_month on public.booking_items(month);
+-- Сүүлийн импортоор нэмэгдсэн / өөрчлөгдсөнийг тодруулахад
+alter table public.booking_items add column if not exists added_at   timestamptz;
+alter table public.booking_items add column if not exists changed_at timestamptz;
+alter table public.booking_items add column if not exists changes    jsonb;
 
 -- ---------- Мэдээ мэдээлэл ----------
 create table if not exists public.news_posts (
