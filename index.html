@@ -497,7 +497,7 @@ const CONFIG = {
 const DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
 const sb = (!DEMO && window.supabase) ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY) : null;
 
-const APP_VER = '2026.11.05g';
+const APP_VER = '2026.11.05h';
 const TABLES = { news_posts:'news', booking_items:'bitems', training_bookings:'books', departments:'depts', employees:'emps', training_types:'types', trainings:'trs', reminder_log:'logs', org_nodes:'nodes' };
 const S = {
   ready:false, auth:null, user:null, view:'dash',
@@ -2074,7 +2074,7 @@ async function startImport(file){
     if(mx >= 0) si = mx; // "Matrix" sheet байвал түүнийг ашиглана
     else sheets.forEach((sh, i) => { try{ const P = parseMatrix(sh.rows); const n = P.recs.length * 2 + P.emps.length; if(n > bestN){ bestN = n; si = i; } } catch{} });
     const qual = buildQual(sheets.filter((_, i) => i !== si)) || buildQual([sheets[si]]);
-    S.imp = { file:file.name, sheets, si, mode:null, months:{}, addNew:true, qual, deactivate: mx >= 0, onlyKnown:false };
+    S.imp = { file:file.name, sheets, si, mode:null, months:{}, addNew:true, qual, deactivate: false, onlyKnown:false };
     try{ const P0 = parseMatrix(sheets[si].rows); if(P0.isLong && S.emps.length){ S.imp.addNew = false; S.imp.onlyKnown = S.types.length > 0; } } catch{} // Qualification record: зөвхөн бүртгэлтэй ажилтан
     parseCurrent(); renderImport();
   } catch(e){ console.error(e); closeModal(); toast(e.message || String(e), 'bad'); }
