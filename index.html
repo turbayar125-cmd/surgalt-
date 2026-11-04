@@ -490,7 +490,7 @@ const CONFIG = {
 const DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
 const sb = (!DEMO && window.supabase) ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY) : null;
 
-const APP_VER = '2026.11.05c';
+const APP_VER = '2026.11.05d';
 const TABLES = { news_posts:'news', booking_items:'bitems', training_bookings:'books', departments:'depts', employees:'emps', training_types:'types', trainings:'trs', reminder_log:'logs', org_nodes:'nodes' };
 const S = {
   ready:false, auth:null, user:null, view:'dash',
@@ -697,7 +697,9 @@ async function loadAll(){
   // is_admin функц байхгүй (шинэ setup.sql ажиллуулаагүй) бол хуучин горимоор бүгд засна
   S.admin = r.error ? /is_admin|function|schema cache/i.test(r.error.message||'') : !!r.data;
   S.admins = [];
-  { const m = S.admin ? { data:null } : await sb.rpc('my_dept'); S.myDept = m.error ? null : (m.data ?? null); }
+  { const m = S.admin ? { data:null } : await sb.rpc('my_dept'); S.myDept = m.error ? null : (m.data ?? null);
+    const me = String(S.user?.email || '').toLowerCase().trim();
+    if(!S.admin && !S.myDept && me) S.myDept = S.depts.find(d => String(d.email || '').toLowerCase().trim() === me)?.id ?? null; } // нөөц: албаны имэйлээр таних
   if(S.myDept){ S.depts = S.depts.filter(d => d.id === S.myDept); S.view = S.view === 'org' ? 'org' : S.view; } // албаны данс: зөвхөн өөрийн алба
   if(S.admin){ const a = await sb.from('app_admins').select('*').order('added_at'); if(!a.error) S.admins = a.data; }
   { const t = await sb.from('employees').select('roster,poi').limit(1); S.extra = !t.error; }
