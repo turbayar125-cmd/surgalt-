@@ -509,7 +509,7 @@ const CONFIG = {
 const DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
 const sb = (!DEMO && window.supabase) ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY) : null;
 
-const APP_VER = '2026.11.05i';
+const APP_VER = '2026.11.08a';
 const TABLES = { news_posts:'news', booking_items:'bitems', training_bookings:'books', departments:'depts', employees:'emps', training_types:'types', trainings:'trs', reminder_log:'logs', org_nodes:'nodes' };
 const S = {
   ready:false, auth:null, user:null, view:'dash',
@@ -776,10 +776,45 @@ async function saveSettings(patch){
   else { const { data, error } = await sb.from('settings').update({ ...patch, updated_at:new Date().toISOString() }).eq('id',1).select().single(); if(error) throw error; S.settings = data; }
   reindex();
 }
+// ---- Сануулгын имэйлийн загвар (setup.sql-ийн fill_tpl-тэй ижил дүрэмтэй) ----
+const REM_DEF = {
+  subject: '{төлөв}: {сургалт} — {нэр}',
+  body: 'Сайн байна уу,\n\n**{алба}** албаны ажилтан **{нэр}** ({код})-ийн **{сургалт}** сургалтын хүчинтэй хугацаа **{дуусах}**-нд дуусна. **{үлдсэн}**.\n\nАлбан тушаал: {албан тушаал} · Хамрагдсан: {хамрагдсан} · Гэрчилгээ: {гэрчилгээ}\n\nХугацаа дуусахаас өмнө давтан сургалтад хамруулна уу. Асуух зүйл байвал HSE-тэй холбогдоно уу.'
+};
+const REM_KEYS = [['нэр','Ажилтны нэр'],['код','SAP код'],['алба','Алба'],['албан тушаал','Албан тушаал'],['сургалт','Сургалтын нэр'],['дуусах','Дуусах огноо'],['хамрагдсан','Хамрагдсан огноо'],['гэрчилгээ','Гэрчилгээний №'],['хоног','Үлдсэн хоног (тоо)'],['үлдсэн','«5 хоног үлдлээ»'],['төлөв','«5 хоногийн дараа дуусна»'],['байгууллага','Байгууллагын нэр']];
+function remVars(c, e){
+  const d = c.days ?? 0;
+  return { 'нэр':e?.full_name||'', 'код':e?.emp_code||'—', 'алба':deptName(e?.department_id)||'—', 'албан тушаал':e?.position||'—', 'сургалт':typeName(c.training_type_id),
+    'дуусах':fmtDate(c.expires_on), 'хамрагдсан':c.completed_on ? fmtDate(c.completed_on) : '—', 'гэрчилгээ':c.certificate_no||'—', 'хоног':String(d),
+    'үлдсэн':d === 0 ? 'Өнөөдөр дуусна' : d + ' хоног үлдлээ', 'төлөв':d === 0 ? 'Өнөөдөр дуусна' : d + ' хоногийн дараа дуусна', 'байгууллага':S.settings.company_name||'' };
+}
+function fillTpl(tpl, vars, html = true){
+  let out = String(tpl || ''); if(html) out = esc(out);
+  for(const [k, v] of Object.entries(vars)) out = out.split('{' + k + '}').join(html ? esc(v) : v);
+  if(!html) return out.replace(/\*\*/g, '');
+  out = out.replace(/\r/g, '').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/^\n+|\n+$/g, '');
+  return '<p>' + out.replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br>') + '</p>';
+}
+const splitMails = v => String(v || '').split(',').map(x => x.trim()).filter(Boolean);
+function remRecipients(e){
+  const cc = splitMails(S.settings.hr_email); let to = splitMails(S.depts.find(d => d.id === e?.department_id)?.email);
+  if(!to.length) to = cc.slice(0, 1);
+  return { to, cc:cc.filter(x => !to.some(t => t.toLowerCase() === x.toLowerCase())) };
+}
+function remPreview(sample, se, subj, body){
+  const v = remVars(sample, se), rc = remRecipients(se);
+  return `<div class="mail"><div class="mail-h"><span>Хэнд</span><b style="font-weight:500">${esc(rc.to.join(', ') || '—')}</b>${rc.cc.length ? `<span>Хуулбар</span><b style="font-weight:500">${esc(rc.cc.join(', '))}</b>` : ''}<span>Гарчиг</span><b>${esc(fillTpl(subj || REM_DEF.subject, v, false))}</b></div>
+    <div class="mail-b">${fillTpl(body || REM_DEF.body, v)}<p class="faint" style="font-size:12px">${esc(S.settings.company_name||'')} · Сургалтын бүртгэлийн систем · otpclicenses.mn</p></div></div>`;
+}
+function updTplPreview(){
+  const f = $('form[data-form=mail-tpl]'), box = $('#tpl-prev'); if(!f || !box) return;
+  const sample = pendingReminders()[0] || activeCurrent().find(c => c.days >= 0); if(!sample) return;
+  box.innerHTML = remPreview(sample, IDX.emp.get(sample.employee_id), f.subject.value.trim(), f.body.value);
+}
 async function sendNow(){
   if(DEMO){
     const p = pendingReminders(); const now = new Date().toISOString();
-    for(const x of p){ const e = IDX.emp.get(x.employee_id); S.logs.unshift({ id:++DEMO_ID, training_id:x.id, days_before:x.bucket, recipients:JSON.stringify([e.email, S.settings.hr_email].filter(Boolean)), sent_at:now }); }
+    for(const x of p){ const e = IDX.emp.get(x.employee_id); S.logs.unshift({ id:++DEMO_ID, training_id:x.id, days_before:x.bucket, recipients:remRecipients(e), sent_at:now }); }
     return p.length;
   }
   const { data, error } = await sb.rpc('send_training_reminders'); if(error) throw error;
@@ -862,7 +897,7 @@ function seedDemo(){
     const sups = Array.from({ length:nSup }, () => mkEmp(di, supPos, head.id));
     for(let i = 1 + nSup; i < cnt; i++) mkEmp(di, pick(staffPos), cnt <= 10 && R() < .5 ? head.id : pick(sups).id);
   });
-  S.settings = { reminder_days:[30,14,7,1,0], hr_email:'hr@otpclicenses.mn', from_email:'Сургалт <noreply@otpclicenses.mn>', company_name:'ОТП ХХК', last_import:null };
+  S.settings = { reminder_days:[30,14,7,1,0], hr_email:'hse@premiumconcrete.mn', from_email:'Сургалт <noreply@otpclicenses.mn>', company_name:'ОТП ХХК', last_import:null };
   DEMO_ID = id; reindex();
   const days = [0,1,7,14,30];
   for(const c of IDX.current){
@@ -1644,9 +1679,10 @@ function viewSettings(){
         <div class="field"><label for="st-days">Хэдэн хоногийн өмнө илгээх</label><input class="inp mono" id="st-days" name="days" value="${esc((s.reminder_days||[]).join(', '))}" placeholder="30, 14, 7, 1, 0">
           <p class="note">Таслалаар тусгаарлана. 0 гэвэл дуусах өдөр нь илгээнэ. Хамгийн их тоо нь "дуусах дөхсөн" төлвийн босго болно.</p></div>
         <div class="grid2">
-          <div class="field"><label for="st-hr">Хүний нөөцийн имэйл (хуулбар)</label><input class="inp" id="st-hr" name="hr_email" type="email" value="${esc(s.hr_email||'')}" placeholder="hr@otpclicenses.mn"></div>
+          <div class="field"><label for="st-hr">Хуулбар (CC)</label><input class="inp" id="st-hr" name="hr_email" value="${esc(s.hr_email||'')}" placeholder="hse@premiumconcrete.mn"></div>
           <div class="field"><label for="st-co">Байгууллагын нэр</label><input class="inp" id="st-co" name="company_name" value="${esc(s.company_name||'')}"></div>
         </div>
+        <p class="note" style="margin:-4px 0 0">Сануулга тухайн ажилтны <b>албаны имэйл</b> рүү очиж, дээрх хаяг хуулбар авна. Албаны имэйлгүй бол зөвхөн хуулбарын хаяг руу. Олон хаягийг таслалаар.</p>
         <div class="field"><label for="st-from">Илгээгч</label><input class="inp" id="st-from" name="from_email" value="${esc(s.from_email||'')}"><p class="note">Resend дээр баталгаажуулсан домэйнтэй байх ёстой. Жишээ: Сургалт &lt;noreply@otpclicenses.mn&gt;</p></div>
         <div class="m-foot" style="justify-content:flex-start"><button class="btn btn-primary" type="submit">Хадгалах</button></div>
       </form>
@@ -1655,10 +1691,14 @@ function viewSettings(){
       <div style="margin-top:8px">${pend.length ? pend.slice(0,6).map(personRow).join('') + (pend.length>6?`<p class="note" style="padding-top:8px">…бас ${pend.length-6}</p>`:'') : '<div class="empty">Илгээх сануулга алга.</div>'}</div>
     </div></section>
     <section class="panel"><div class="panel-head"><h2>Имэйлийн загвар</h2></div><div class="panel-body">
-      ${sample ? `<div class="mail"><div class="mail-h"><span>Хэнд</span><b style="font-weight:500">${esc(se.email||s.hr_email||'—')}</b>${s.hr_email?`<span>Хуулбар</span><b style="font-weight:500">${esc(s.hr_email)}</b>`:''}<span>Гарчиг</span><b>${sample.days===0?'Өнөөдөр дуусна':sample.days+' хоногийн дараа дуусна'}: ${esc(typeName(sample.training_type_id))} — ${esc(se.full_name)}</b></div>
-        <div class="mail-b"><p>Сайн байна уу, ${esc(se.full_name)}.</p><p>Таны <b>${esc(typeName(sample.training_type_id))}</b> сургалтын хүчинтэй хугацаа <b>${fmtDate(sample.expires_on)}</b>-нд дуусна. <b>${sample.days===0?'Өнөөдөр дуусна':sample.days+' хоног үлдлээ'}</b>.</p>
-        <p class="muted">Ажилтан: ${esc(se.full_name)} (${esc(se.emp_code||'—')}) · Алба: ${esc(deptName(se.department_id))} · Хамрагдсан: ${fmtDate(sample.completed_on)} · Гэрчилгээ: ${esc(sample.certificate_no||'—')}</p>
-        <p>Хугацаа дуусахаас өмнө давтан сургалтад хамрагдана уу. Асуух зүйл байвал хүний нөөцийн албатай холбогдоно уу.</p><p class="faint" style="font-size:12px">${esc(s.company_name||'')} · Сургалтын бүртгэлийн систем</p></div></div>` : '<div class="empty">Жишээ харуулах сургалт алга.</div>'}
+      ${sample ? `<div id="tpl-prev">${remPreview(sample, se, s.rem_subject, s.rem_body)}</div>
+      <form data-form="mail-tpl" style="display:flex;flex-direction:column;gap:10px;margin-top:14px">
+        <div class="field"><label for="tp-subj">Гарчиг</label><input class="inp" id="tp-subj" name="subject" value="${esc(s.rem_subject || REM_DEF.subject)}"></div>
+        <div class="field"><label for="tp-body">Агуулга</label><textarea class="inp" id="tp-body" name="body" rows="10" style="resize:vertical;font-family:inherit;line-height:1.5">${esc(s.rem_body || REM_DEF.body)}</textarea>
+          <p class="note"><b>**тод**</b> = тод бичиг, хоосон мөр = шинэ догол мөр. Доорх хувьсагч дээр дарж курсорын байрлалд оруулна:</p>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">${REM_KEYS.map(([k, t]) => `<button type="button" class="btn btn-sm" data-act="tpl-ins" data-k="${esc(k)}" title="${esc(t)}">{${esc(k)}}</button>`).join('')}</div></div>
+        <div class="m-foot" style="justify-content:flex-start;gap:8px"><button class="btn btn-primary" type="submit">Загвар хадгалах</button><button class="btn" type="button" data-act="tpl-reset">Анхдагч загвар</button></div>
+      </form>` : '<div class="empty">Жишээ харуулах сургалт алга.</div>'}
       <h4 style="margin:18px 0 6px;font-size:14px">Илгээсэн түүх</h4>
       ${S.logs.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Огноо</th><th>Ажилтан</th><th>Сургалт</th><th class="num">Үе</th></tr></thead><tbody>${S.logs.slice(0,12).map(l => { const t = S.trs.find(x => x.id === l.training_id); const e = t && IDX.emp.get(t.employee_id); return `<tr><td class="mono">${fmtDate((l.sent_at||'').slice(0,10))}</td><td>${esc(e?.full_name||'—')}</td><td>${esc(t?typeName(t.training_type_id):'—')}</td><td class="num mono">${l.days_before} хон</td></tr>`; }).join('')}</tbody></table></div>` : '<div class="empty">Одоогоор имэйл илгээгээгүй.</div>'}
     </div></section>
@@ -2267,6 +2307,10 @@ const ACT = {
   export: () => exportCSV(),
   'copy-csv': async () => { const t = $('#exp-csv'); try{ await navigator.clipboard.writeText(t.value); toast('Хуулагдлаа'); } catch{ t.select(); toast('Сонгогдлоо. Ctrl+C дарна уу'); } },
   'dl-csv': () => { try{ const b = new Blob(['﻿'+$('#exp-csv').value], { type:'text/csv;charset=utf-8' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `surgalt-${todayStr()}.csv`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 2000); } catch{ toast('Татаж чадсангүй. Хуулах товчийг ашиглана уу','bad'); } },
+  'tpl-ins': a => { const ta = $('#tp-body'), sj = $('#tp-subj'); const el = document.activeElement === sj || S.tplFocus === 'subj' ? sj : ta; if(!el) return;
+    const k = '{' + a.dataset.k + '}', i = el.selectionStart ?? el.value.length, j = el.selectionEnd ?? i;
+    el.value = el.value.slice(0, i) + k + el.value.slice(j); el.focus(); el.selectionStart = el.selectionEnd = i + k.length; updTplPreview(); },
+  'tpl-reset': () => { const f = $('form[data-form=mail-tpl]'); if(!f) return; f.subject.value = REM_DEF.subject; f.body.value = REM_DEF.body; updTplPreview(); toast('Анхдагч загварыг буцаалаа. Хадгалахын тулд «Загвар хадгалах» дарна.'); },
   'send-now': async a => { a.disabled = true; const n = await run(sendNow, n => DEMO ? `Демо: ${n} имэйл илгээгдэх байсан` : `${n} сануулга илгээлээ`); a.disabled = false; if(n != null) render(); },
   'del-dept': async a => { const d = IDX.dept.get(Number(a.dataset.id)); const c = S.emps.filter(e => e.department_id === d.id).length; if(!await askConfirm(`"${d.name}" албыг устгах уу?${c?` ${c} ажилтан албагүй болно.`:''}`)) return; await run(async () => { await dbDelete('departments', d.id); render(); }, 'Алба устгагдлаа'); },
   'del-type': async a => { const t = IDX.type.get(Number(a.dataset.id)); const c = S.trs.filter(x => x.training_type_id === t.id).length; if(!await askConfirm(`"${t.name}"-г устгах уу?${c?` Үүнтэй холбоотой ${c} бичлэг мөн устна.`:''}`)) return; await run(async () => { await dbDelete('training_types', t.id); render(); }, 'Устгагдлаа'); },
@@ -2357,7 +2401,7 @@ const ACT = {
     Object.assign(S, { ready:false, auth:'login', user:null, admin:false, admins:[], imports:[], depts:[], emps:[], trs:[], types:[], logs:[], view:'dash', org:null });
     closeModal(); document.body.classList.remove('ro'); render(); toast('Системээс гарлаа'); }
 };
-const ADMIN_ACTS = new Set(['type-clean','lic-add','lic-edit','lic-renew','lic-send','lic-prev','news-new','news-edit','news-del','lic-types','bk-new','bk-item','bk-set','bk-rm','bk-cancel','bk-done','bim-apply','bp-apply','undo-imp','wipe-all','new-emp','edit-emp','del-emp','new-tr','edit-tr','renew','del-tr','bulk','bulk-all','send-now','del-dept','del-type','pick-photo','imp-apply','del-admin']);
+const ADMIN_ACTS = new Set(['type-clean','lic-add','lic-edit','lic-renew','lic-send','lic-prev','news-new','news-edit','news-del','lic-types','bk-new','bk-item','bk-set','bk-rm','bk-cancel','bk-done','bim-apply','bp-apply','undo-imp','wipe-all','new-emp','edit-emp','del-emp','new-tr','edit-tr','renew','del-tr','bulk','bulk-all','send-now','tpl-ins','tpl-reset','del-dept','del-type','pick-photo','imp-apply','del-admin']);
 const denied = () => { toast('Танд засах эрх алга. Админтай холбогдоно уу.','bad'); };
 document.addEventListener('click', ev => { const a = ev.target.closest('[data-act]'); if(!a) return; if(!S.admin && ADMIN_ACTS.has(a.dataset.act)){ ev.preventDefault(); return denied(); } const f = ACT[a.dataset.act]; if(f){ if(a.tagName === 'A') ev.preventDefault(); f(a, ev); } });
 document.addEventListener('keydown', ev => {
@@ -2372,8 +2416,10 @@ document.addEventListener('dragover', ev => { const z = ev.target.closest?.('[da
 document.addEventListener('dragleave', ev => { const z = ev.target.closest?.('[data-drop]'); if(z && !z.contains(ev.relatedTarget)) z.classList.remove('over'); });
 document.addEventListener('drop', ev => { const z = ev.target.closest?.('[data-drop]'); if(!z) return; ev.preventDefault(); if(!S.admin) return denied(); z.classList.remove('over'); const f = ev.dataTransfer.files[0]; if(f) startImport(f); });
 function updBulkCount(){ const n = $$('.pick-list input:checked').length; const c = $('#b-count'); if(c) c.textContent = `${n} сонгосон`; }
+document.addEventListener('focusin', ev => { if(ev.target.id === 'tp-subj') S.tplFocus = 'subj'; else if(ev.target.id === 'tp-body') S.tplFocus = 'body'; });
 document.addEventListener('input', ev => {
   const t = ev.target;
+  if(t.form?.dataset.form === 'mail-tpl') updTplPreview();
   if(t.dataset.filter){ const o = S[t.dataset.filter]; o[t.dataset.key] = t.type === 'checkbox' ? t.checked : t.value; $('#list').innerHTML = t.dataset.filter === 'ef' ? listEmps() : t.dataset.filter === 'lf' ? listLic() : listTrs(); }
   if(t.dataset.bv !== undefined && S.bv){ S.bv[t.dataset.bv] = t.value; if(t.dataset.bv === 'q'){ $('#bk-body').innerHTML = S.bv.view === 'due' ? bkDueView(dueList()) : S.bv.view === 'dept' ? bkDeptView(bkFiltered()) : S.bv.view === 'type' ? bkTypeView(bkFiltered()) : bkDayView(bkFiltered()); } else render(); }
   if('empq' in t.dataset){ const q = t.value.trim().toLowerCase(), sel = $('#t-emp'); let first = null; [...sel.options].forEach(o => { o.hidden = !!q && !o.dataset.s.includes(q); if(!o.hidden && !first) first = o; }); if(first && (!sel.value || sel.selectedOptions[0]?.hidden)) sel.value = first.value; }
@@ -2460,6 +2506,13 @@ const FORMS = {
     const days = [...new Set(f.days.value.split(/[,\s]+/).map(Number).filter(n => Number.isInteger(n) && n >= 0))].sort((a,b) => b-a);
     if(!days.length) return toast('Дор хаяж нэг хоног оруулна уу','bad');
     const r = await run(() => saveSettings({ reminder_days:days, hr_email:f.hr_email.value.trim()||null, from_email:f.from_email.value.trim(), company_name:f.company_name.value.trim(), ...('hide_expired_days' in S.settings || DEMO ? { hide_expired_days:Math.max(0, Number(f.hide_days.value)||0) } : {}) }), 'Тохиргоо хадгалагдлаа');
+    render();
+  },
+  'mail-tpl': async f => {
+    if(!DEMO && !('rem_body' in S.settings)) return toast('Supabase дээр шинэ setup.sql-ийг ажиллуулна уу','bad');
+    const subj = f.subject.value.trim(), body = f.body.value.replace(/\r/g, '').trim();
+    if(!subj || !body) return toast('Гарчиг, агуулгыг бөглөнө үү','bad');
+    await run(() => saveSettings({ rem_subject:subj === REM_DEF.subject ? null : subj, rem_body:body === REM_DEF.body ? null : body }), 'Имэйлийн загвар хадгалагдлаа');
     render();
   },
   'add-dept': async f => { const n = f.name.value.trim(); await run(async () => { await dbInsert('departments', { name:n, sort:S.depts.length+1 }); render(); }, 'Алба нэмэгдлээ'); },

@@ -80,6 +80,12 @@ alter table public.settings add column if not exists last_import jsonb;
 alter table public.settings add column if not exists last_book jsonb;
 alter table public.settings add column if not exists hide_expired_days int not null default 500;
 insert into public.settings (id) values (1) on conflict (id) do nothing;
+-- Сануулгын имэйлийн загвар (хоосон = анхдагч загвар)
+alter table public.settings add column if not exists rem_subject text;
+alter table public.settings add column if not exists rem_body text;
+-- Хуулбар (CC) — анхдагчаар HSE
+update public.settings set hr_email = 'hse@premiumconcrete.mn'
+  where hr_email is null or trim(hr_email) = '' or lower(trim(hr_email)) = 'turbayar.o@premiumconcrete.mn';
 
 -- Excel импорт бүрийн бүртгэл (буцаахад хэрэглэнэ)
 create table if not exists public.import_log (
@@ -257,6 +263,25 @@ language sql immutable as $$
   select replace(replace(replace(replace(coalesce(s,''), '&','&amp;'), '<','&lt;'), '>','&gt;'), '"','&quot;');
 $$;
 
+-- Загвар бөглөх: {түлхүүр} → утга, **тод**, хоосон мөр = догол мөр
+create or replace function public.fill_tpl(tpl text, vars jsonb, html boolean default true) returns text
+language plpgsql immutable as $$
+declare k text; v text; out text := coalesce(tpl, '');
+begin
+  if html then out := public.html_esc(out); end if;
+  for k, v in select key, value from jsonb_each_text(vars) loop
+    out := replace(out, '{' || k || '}', case when html then public.html_esc(coalesce(v, '')) else coalesce(v, '') end);
+  end loop;
+  if not html then return regexp_replace(out, '\*\*', '', 'g'); end if;
+  out := regexp_replace(replace(out, E'\r', ''), '\*\*(.+?)\*\*', '<b>\1</b>', 'g');
+  return '<p style="margin:0 0 12px">' || replace(regexp_replace(trim(both E'\n' from out), E'\n{2,}', '</p><p style="margin:0 0 12px">', 'g'), E'\n', '<br>') || '</p>';
+end $$;
+
+create or replace function public.rem_default_subject() returns text language sql immutable as $$
+  select '{төлөв}: {сургалт} — {нэр}'::text $$;
+create or replace function public.rem_default_body() returns text language sql immutable as $$
+  select E'Сайн байна уу,\n\n**{алба}** албаны ажилтан **{нэр}** ({код})-ийн **{сургалт}** сургалтын хүчинтэй хугацаа **{дуусах}**-нд дуусна. **{үлдсэн}**.\n\nАлбан тушаал: {албан тушаал} · Хамрагдсан: {хамрагдсан} · Гэрчилгээ: {гэрчилгээ}\n\nХугацаа дуусахаас өмнө давтан сургалтад хамруулна уу. Асуух зүйл байвал HSE-тэй холбогдоно уу.'::text $$;
+
 create or replace function public.send_training_reminders() returns int
 language plpgsql security definer set search_path = public, extensions as $$
 declare
@@ -265,6 +290,8 @@ declare
   today  date := (now() at time zone 'Asia/Ulaanbaatar')::date;
   r      record;
   rcpt   text[];
+  cc     text[];
+  vars   jsonb;
   subj   text;
   body   text;
   sent   int := 0;
@@ -289,7 +316,7 @@ begin
       from cur c
       where c.expires_on >= today
     )
-    select d.*, e.full_name, e.emp_code, e.email, dp.name as dept_name, tt.name as type_name
+    select d.*, e.full_name, e.emp_code, e.email, e.position, dp.name as dept_name, nullif(trim(dp.email),'') as dept_email, tt.name as type_name
     from due d
     join public.employees e on e.id = d.employee_id and e.active
     join public.training_types tt on tt.id = d.training_type_id
@@ -298,31 +325,38 @@ begin
       and not exists (select 1 from public.reminder_log l where l.training_id = d.id and l.days_before = d.bucket)
     order by d.days_left
   loop
-    rcpt := array_remove(array[nullif(trim(r.email),''), nullif(trim(cfg.hr_email),'')], null);
-    if coalesce(array_length(rcpt,1),0) = 0 then continue; end if;
+    -- Хэнд: ажилтны албаны имэйл. Хуулбар: тохиргооны CC (анхдагч HSE)
+    cc   := array(select trim(x) from unnest(string_to_array(coalesce(cfg.hr_email, ''), ',')) x where trim(x) <> '');
+    rcpt := array(select trim(x) from unnest(string_to_array(coalesce(r.dept_email, ''), ',')) x where trim(x) <> '');
+    if coalesce(array_length(rcpt,1),0) = 0 then
+      if coalesce(array_length(cc,1),0) = 0 then continue; end if;
+      rcpt := array[cc[1]];
+    end if;
+    cc := array(select x from unnest(cc) x where lower(x) <> all(array(select lower(y) from unnest(rcpt) y)));
 
-    subj := case when r.days_left = 0 then 'Өнөөдөр дуусна' else r.days_left || ' хоногийн дараа дуусна' end
-            || ': ' || r.type_name || ' — ' || r.full_name;
+    vars := jsonb_build_object(
+      'нэр', r.full_name, 'код', coalesce(r.emp_code,'—'), 'алба', coalesce(r.dept_name,'—'),
+      'албан тушаал', coalesce(r.position,'—'), 'сургалт', r.type_name,
+      'дуусах', to_char(r.expires_on, 'YYYY.MM.DD'), 'хамрагдсан', coalesce(to_char(r.completed_on, 'YYYY.MM.DD'),'—'),
+      'гэрчилгээ', coalesce(r.certificate_no,'—'), 'хоног', r.days_left::text,
+      'үлдсэн', case when r.days_left = 0 then 'Өнөөдөр дуусна' else r.days_left || ' хоног үлдлээ' end,
+      'төлөв', case when r.days_left = 0 then 'Өнөөдөр дуусна' else r.days_left || ' хоногийн дараа дуусна' end,
+      'байгууллага', coalesce(cfg.company_name,''));
+    subj := public.fill_tpl(coalesce(nullif(trim(cfg.rem_subject),''), public.rem_default_subject()), vars, false);
     body := '<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5;color:#172033">'
-      || '<p>Сайн байна уу, ' || html_esc(r.full_name) || '.</p>'
-      || '<p>Таны <b>' || html_esc(r.type_name) || '</b> сургалтын хүчинтэй хугацаа <b>'
-      || to_char(r.expires_on, 'YYYY.MM.DD') || '</b>-нд дуусна. <b>'
-      || case when r.days_left = 0 then 'Өнөөдөр дуусна' else r.days_left || ' хоног үлдлээ' end || '</b>.</p>'
-      || '<p style="color:#5a6479">Ажилтан: ' || html_esc(r.full_name) || ' (' || html_esc(coalesce(r.emp_code,'—')) || ')'
-      || ' · Алба: ' || html_esc(coalesce(r.dept_name,'—'))
-      || ' · Хамрагдсан: ' || to_char(r.completed_on, 'YYYY.MM.DD')
-      || ' · Гэрчилгээ: ' || html_esc(coalesce(r.certificate_no,'—')) || '</p>'
-      || '<p>Хугацаа дуусахаас өмнө давтан сургалтад хамрагдана уу. Асуух зүйл байвал хүний нөөцийн албатай холбогдоно уу.</p>'
-      || '<p style="color:#8a93a6;font-size:12px">' || html_esc(cfg.company_name) || ' · Сургалтын бүртгэлийн систем</p></div>';
+      || public.fill_tpl(coalesce(nullif(trim(cfg.rem_body),''), public.rem_default_body()), vars, true)
+      || '<p style="color:#8a93a6;font-size:12px;margin:16px 0 0">' || html_esc(cfg.company_name) || ' · Сургалтын бүртгэлийн систем · otpclicenses.mn</p></div>';
 
     perform net.http_post(
       url     := 'https://api.resend.com/emails',
       headers := jsonb_build_object('Authorization', 'Bearer ' || api, 'Content-Type', 'application/json'),
-      body    := jsonb_build_object('from', cfg.from_email, 'to', to_jsonb(rcpt), 'subject', subj, 'html', body) || case when nullif(trim(cfg.reply_to),'') is not null then jsonb_build_object('reply_to', trim(cfg.reply_to)) else '{}'::jsonb end
+      body    := jsonb_build_object('from', cfg.from_email, 'to', to_jsonb(rcpt), 'subject', subj, 'html', body)
+                 || case when coalesce(array_length(cc,1),0) > 0 then jsonb_build_object('cc', to_jsonb(cc)) else '{}'::jsonb end
+                 || case when nullif(trim(cfg.reply_to),'') is not null then jsonb_build_object('reply_to', trim(cfg.reply_to)) else '{}'::jsonb end
     );
 
     insert into public.reminder_log (training_id, days_before, recipients)
-    values (r.id, r.bucket, to_jsonb(rcpt))
+    values (r.id, r.bucket, jsonb_build_object('to', rcpt, 'cc', cc))
     on conflict (training_id, days_before) do nothing;
     sent := sent + 1;
   end loop;
