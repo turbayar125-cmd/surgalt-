@@ -1898,7 +1898,11 @@ function loadXLSX(){
 async function readSheets(file){
   if(/\.(csv|txt|tsv)$/i.test(file.name)) return [{ name:file.name, rows:parseCSV(await file.text()) }];
   const X = await loadXLSX(); const wb = X.read(await file.arrayBuffer(), { type:'array' });
-  return wb.SheetNames.map(n => ({ name:n, rows:X.utils.sheet_to_json(wb.Sheets[n], { header:1, raw:true, defval:'', blankrows:false }) })).filter(x => x.rows.length);
+  // Excel-ийн "!ref" (хүснэгтийн хэмжээ) хуучирсан байвал доод мөрүүд уншигдахгүй — бодит нүднүүдээс дахин тооцоолно
+  const fixRef = ws => { let r1 = Infinity, c1 = Infinity, r2 = -1, c2 = -1;
+    for(const k in ws){ if(k[0] === '!') continue; const a = X.utils.decode_cell(k); if(a.r < r1) r1 = a.r; if(a.c < c1) c1 = a.c; if(a.r > r2) r2 = a.r; if(a.c > c2) c2 = a.c; }
+    if(r2 >= 0) ws['!ref'] = X.utils.encode_range({ s:{ r:Math.min(r1, 0), c:Math.min(c1, 0) }, e:{ r:r2, c:c2 } }); return ws; };
+  return wb.SheetNames.map(n => ({ name:n, rows:X.utils.sheet_to_json(fixRef(wb.Sheets[n]), { header:1, raw:true, defval:'', blankrows:false }) })).filter(x => x.rows.length);
 }
 const cellStr = v => String(v ?? '').replace(/\s+/g, ' ').trim();
 const normKey = v => cellStr(v).toLowerCase().replace(/[\s.\-_/\\()№#:,'"]+/g, '');
@@ -1991,7 +1995,8 @@ function parseMatrix(rows){
     const filled = r.filter(v => cellStr(v)).length;
     let name = cellStr(get('name')); const code = cellStr(get('code'));
     if(col.last != null && name && cellStr(get('last'))) name = cellStr(get('last'))[0] + '.' + name;
-    if(filled === 1 && !code){ const t = cellStr(r.find(v => cellStr(v))); if(isSection(t)){ section = t; return; } } // "BP алба" гэх мэт бүлгийн гарчиг
+    const looksPerson = t => /^[А-ЯӨҮЁA-Z]{1,2}\.\s?\S/i.test(t) || /^[А-ЯӨҮЁа-яөүё\-]+\s+[А-ЯӨҮЁа-яөүё\-]+$/.test(t) && !/алба|хэлтэс|нэгж|\bбаг\b/i.test(t);
+    if(filled === 1 && !code){ const t = cellStr(r.find(v => cellStr(v))); if(isSection(t) && !(col.name != null && cellStr(r[col.name]) === t && looksPerson(t))){ section = t; return; } } // "BP алба" гэх мэт бүлгийн гарчиг
     if(!name && !code) return;
     if(/^\d+([.,]\d+)?$/.test(name)) return; // томьёоны хог мөр (жишээ нь бүх нүдэнд "229")
     name = cleanName(name);
@@ -2067,7 +2072,7 @@ function planImport(P, opt){
   const newKeys = new Map();
   P.emps.forEach((r, i) => {
     let e = r.code && byCode.get(codeK(r.code));
-    if(!e){ let c = []; for(const k of nameKeys(r.name)){ c = byName.get(k) || []; if(c.length) break; }
+    if(!e){ let c = []; for(const k of nameKeys(r.name)){ c = byName.get(k) || []; if(r.code) c = c.filter(x => !x.emp_code); if(c.length) break; } // өөр кодтой ижил нэртэй хүнтэй нийлүүлэхгүй
       if(c.length > 1){ const d = matchDept(r.dept, deptMap); const cc = d ? c.filter(x => x.department_id === d.id) : []; if(cc.length === 1) c = cc; }
       if(c.length > 1){ out.errors.push(`${r.line}-р мөр: "${r.name}" нэртэй ${c.length} ажилтан байна — "Код" багана нэмбэл ялгана`); out.resolved[i] = 'skip'; return; }
       e = c[0]; }
@@ -2090,12 +2095,14 @@ function planImport(P, opt){
     } else if(!r.name){ out.errors.push(`${r.line}-р мөр: "${r.code}" кодтой ажилтан системд алга, нэр нь хоосон`); out.resolved[i] = 'skip'; }
     else if(!opt.addNew){ out.errors.push(`${r.line}-р мөр: "${r.name}" системд алга (алгаслаа)`); out.resolved[i] = 'skip'; }
     else {
-      const k = r.code ? 'c:' + codeK(r.code) : 'n:' + normKey(r.name);
-      if(newKeys.has(k)){ out.resolved[i] = newKeys.get(k); return; }
+      const k = r.code ? 'c:' + codeK(r.code) : 'n:' + normKey(r.name) + '|' + normKey(r.dept) + '|' + normKey(r.pos);
+      if(newKeys.has(k)){ out.resolved[i] = newKeys.get(k); if(!P.isLong && !r.code) out.errors.push(`${r.line}-р мөр: "${r.name}" өмнөх мөртэй давхардсан (нэр, алба, албан тушаал ижил) — ялгахын тулд "Код" багана нэмнэ үү`); return; }
       if(r.dept && !matchDept(r.dept, deptMap) && !out.newDepts.includes(r.dept)) out.newDepts.push(r.dept);
       const ne = { _new:true, row:r }; out.empNew.push(ne); newKeys.set(k, ne); out.resolved[i] = ne;
     }
   });
+  if(!P.isLong){ const cnt = new Map(); out.resolved.forEach((w, i) => { if(w && w !== 'skip' && !w._new){ if(cnt.has(w.id)) out.errors.push(`${P.emps[i].line}-р мөр: "${P.emps[i].name}" нь ${P.emps[cnt.get(w.id)].line}-р мөртэй нэг ажилтан гэж танигдлаа — өөр хүн бол "Код" багана нэмнэ үү`); else cnt.set(w.id, i); } }); }
+  out.skippedRows = out.resolved.filter(x => x === 'skip').length;
   const seen = new Set();
   for(const x of P.recs){
     const who = out.resolved[x.emp]; if(!who || who === 'skip') continue;
@@ -2171,7 +2178,7 @@ function renderImport(){
       <div><b>${pl.empNew.length}</b><span>Шинэ ажилтан</span></div>
       <div><b>${pl.empUpd.length}</b><span>Мэдээлэл шинэчлэгдэх</span></div>
     </div>
-    <dl class="kv" style="margin:0"><dt>Гарчиг</dt><dd>${P.headerLine}-р мөр${P.subMode ? ' (2 мөр гарчигтай)' : ''} · ${P.emps.length} ажилтны мөр</dd>
+    <dl class="kv" style="margin:0"><dt>Гарчиг</dt><dd>${P.headerLine}-р мөр${P.subMode ? ' (2 мөр гарчигтай)' : ''} · ${P.emps.length} ажилтны мөр${pl.skippedRows ? ` · <span style="color:var(--bad)">${pl.skippedRows} мөр орохгүй (доорх анхааруулгыг харна уу)</span>` : ''}</dd>
       <dt>Ажилтны багана</dt><dd>${P.found.map(f => `<span class="chip chip-plain">${f}</span>`).join(' ')}${P.sections ? ' <span class="chip chip-plain">Алба (бүлгийн гарчгаас)</span>' : ''}</dd>
       <dt>Сургалт</dt><dd>${P.isLong ? 'Жагсаалт хэлбэр (мөр бүр нэг сургалт)' : P.groups.length ? P.groups.map(g => `<span class="chip ${pl.newTypes.some(n => normKey(n.name) === normKey(g)) ? 'chip-warn' : 'chip-plain'}">${esc(g)}</span>`).join(' ') : '<span class="muted">Сургалтын багана олдсонгүй — зөвхөн ажилтны мэдээлэл шинэчлэгдэнэ</span>'}</dd>
       ${P.skipped.length ? `<dt>Алгассан</dt><dd class="muted">${P.skipped.map(esc).join(', ')} <span class="faint">(огноо агуулаагүй)</span></dd>` : ''}</dl>
