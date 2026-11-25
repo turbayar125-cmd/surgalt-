@@ -1804,7 +1804,8 @@ function refresh(){ render(); if(S.openEmp && $('.drawer')){ $('.drawer .m-body'
 function profileBody(id){
   const e = IDX.emp.get(id); if(!e) return '<div class="empty">Ажилтан олдсонгүй.</div>';
   const cur = (IDX.byEmp.get(id)||[]).sort((a,b) => a.days - b.days);
-  const old = S.trs.filter(t => t.employee_id === id && !IDX.currentIds.has(t.id)).sort((a,b) => b.expires_on.localeCompare(a.expires_on));
+  const old = S.trs.filter(t => t.employee_id === id && !IDX.currentIds.has(t.id)).map(t => { const days = daysUntil(t.expires_on); return { ...t, days, status:statusOf(days) }; }).sort((a,b) => b.expires_on.localeCompare(a.expires_on));
+  const all = [...cur.map(c => [c, true]), ...old.map(t => [t, false])]; // өмнөх бичлэгүүд үндсэн жагсаалтад, хамгийн доор
   const mgr = e.manager_id ? IDX.emp.get(e.manager_id) : null;
   const reps = S.emps.filter(x => x.manager_id === id && x.active).sort((a,b) => a.full_name.localeCompare(b.full_name,'mn'));
   return `<div class="prof-top"><div class="prof-photo" data-photo-drop="${id}">${avatarPick(e,'xl')}<label class="btn btn-sm">Зураг ${e.photo_url?'солих':'оруулах'}<input type="file" accept="image/*" data-photo="${id}" hidden></label></div>
@@ -1817,9 +1818,8 @@ function profileBody(id){
       ${e.notes ? `<p class="note" style="margin-top:10px;white-space:pre-line">${esc(e.notes)}</p>` : ''}
       <div class="actions" style="margin-top:14px"><button class="btn btn-sm" data-act="edit-emp" data-id="${id}">Мэдээлэл засах</button><button class="btn btn-sm btn-danger" data-act="del-emp" data-id="${id}">Устгах</button></div></div></div>
   ${reps.length ? `<div><h4 style="font-size:14px;margin-bottom:8px">Шууд харьяалагдах (${reps.length})</h4><div class="chips-row">${reps.map(r => `<button class="pchip" data-act="profile" data-id="${r.id}">${avatar(r,'sm')}${esc(r.full_name)}</button>`).join('')}</div></div>` : ''}
-  <div class="sec-head"><h4>Сургалтууд (${cur.length})</h4><button class="btn btn-sm btn-primary" data-act="new-tr" data-emp="${id}">+ Сургалт нэмэх</button></div>
-  <div class="tr-list">${cur.length ? cur.map(c => trCard(c, true)).join('') : '<div class="empty">Сургалт бүртгэгдээгүй байна.</div>'}</div>
-  ${old.length ? `<details class="hist"><summary>Өмнөх бичлэгүүд (${old.length})</summary><div class="tr-list" style="margin-top:8px">${old.map(t => trCard(t, false)).join('')}</div></details>` : ''}
+  <div class="sec-head"><h4>Сургалтууд (${all.length})</h4><button class="btn btn-sm btn-primary" data-act="new-tr" data-emp="${id}">+ Сургалт нэмэх</button></div>
+  <div class="tr-list">${all.length ? all.map(([t, c]) => trCard(t, c)).join('') : '<div class="empty">Сургалт бүртгэгдээгүй байна.</div>'}</div>
   ${(() => { const dl = (S.dels || []).filter(d => d.employee_id === id); return dl.length ? `<details class="hist"><summary>Устгасан сургалт (${delGroups(dl).length})</summary><div class="tr-list" style="margin-top:8px">${delList(dl, false)}</div></details>` : ''; })()}`;
 }
 const isPdf = u => /\.pdf(\?|$)/i.test(u || '');
@@ -1838,7 +1838,7 @@ function trCard(t, isCur){
   return `<div class="tr-card"><div style="min-width:0"><div class="tr-name">${esc(typeName(t.training_type_id))}</div>
     <div class="tr-meta"><span>Хамрагдсан <span class="mono">${fmtDate(t.completed_on)}</span></span><span>Дуусах <span class="mono">${fmtDate(t.expires_on)}</span></span>${t.certificate_no?`<span>№ <span class="mono">${esc(t.certificate_no)}</span></span>`:''}${t.provider?`<span>${esc(t.provider)}</span>`:''}</div>
     ${t.notes?`<div class="tr-meta">${esc(t.notes)}</div>`:''}${t.proof_url ? `<div style="margin-top:6px">${proofThumb(t.proof_url)}</div>` : ''}</div>
-    <div>${isCur ? chip(t.status, daysText(t.days)) : chip('plain','Өмнөх')}</div>
+    <div>${t.status ? chip(t.status, daysText(t.days)) : chip('plain','Өмнөх')}</div>
     <div class="tr-act">${isCur?`<button class="btn btn-sm" data-act="renew" data-id="${t.id}">Сунгах</button>`:''}<button class="btn btn-sm" data-act="edit-tr" data-id="${t.id}">Засах</button><button class="btn btn-sm btn-danger" data-act="del-tr" data-id="${t.id}">Устгах</button></div></div>`;
 }
 function tenure(d){ const m = Math.floor(-daysUntil(d) / 30.44); if(m < 0) return 'эхлээгүй'; const y = Math.floor(m/12), r = m % 12; return (y ? y+' жил ' : '') + (r || !y ? r+' сар' : '').trim(); }
