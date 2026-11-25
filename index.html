@@ -1805,7 +1805,10 @@ function profileBody(id){
   const e = IDX.emp.get(id); if(!e) return '<div class="empty">Ажилтан олдсонгүй.</div>';
   const cur = (IDX.byEmp.get(id)||[]).sort((a,b) => a.days - b.days);
   const old = S.trs.filter(t => t.employee_id === id && !IDX.currentIds.has(t.id)).map(t => { const days = daysUntil(t.expires_on); return { ...t, days, status:statusOf(days) }; }).sort((a,b) => b.expires_on.localeCompare(a.expires_on));
-  const all = [...cur.map(c => [c, true]), ...old.map(t => [t, false])]; // өмнөх бичлэгүүд үндсэн жагсаалтад, хамгийн доор
+  // Нэг сургалт давхардвал зөвхөн хамгийн сүүлд суусныг харуулна. Хуучин бичлэгүүд санд хадгалагдсан хэвээр.
+  // Харин 500+ хоног хэтэрсэн эсвэл албан тушаалд хамааралгүй гэж тооцооноос хасагдсан сургалтын сүүлийн бичлэгийг (cur-д байхгүй) мөн харуулна.
+  const curTypes = new Set(cur.map(c => c.training_type_id)), seenT = new Set();
+  const all = [...cur.map(c => [c, true]), ...old.filter(t => !curTypes.has(t.training_type_id) && !seenT.has(t.training_type_id) && seenT.add(t.training_type_id)).map(t => [t, false])];
   const mgr = e.manager_id ? IDX.emp.get(e.manager_id) : null;
   const reps = S.emps.filter(x => x.manager_id === id && x.active).sort((a,b) => a.full_name.localeCompare(b.full_name,'mn'));
   return `<div class="prof-top"><div class="prof-photo" data-photo-drop="${id}">${avatarPick(e,'xl')}<label class="btn btn-sm">Зураг ${e.photo_url?'солих':'оруулах'}<input type="file" accept="image/*" data-photo="${id}" hidden></label></div>
