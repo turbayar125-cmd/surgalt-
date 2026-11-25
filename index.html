@@ -2147,11 +2147,40 @@ async function startImport(file){
     const mx = sheets.findIndex(sh => /^\s*matrix\s*$/i.test(sh.name));
     if(mx >= 0) si = mx; // "Matrix" sheet байвал түүнийг ашиглана
     else sheets.forEach((sh, i) => { try{ const P = parseMatrix(sh.rows); const n = P.recs.length * 2 + P.emps.length; if(n > bestN){ bestN = n; si = i; } } catch{} });
+    const added = mx >= 0 ? fillMatrixGaps(sheets, si) : [];
     const qual = buildQual(sheets.filter((_, i) => i !== si)) || buildQual([sheets[si]]);
-    S.imp = { file:file.name, sheets, si, mode:null, months:{}, addNew:true, qual, deactivate: false, onlyKnown:false };
+    S.imp = { file:file.name, sheets, si, mode:null, months:{}, addNew:true, qual, deactivate: false, onlyKnown:false, added };
     try{ const P0 = parseMatrix(sheets[si].rows); if(P0.isLong && S.emps.length){ S.imp.addNew = false; S.imp.onlyKnown = S.types.length > 0; } } catch{} // Qualification record: зөвхөн бүртгэлтэй ажилтан
     parseCurrent(); renderImport();
   } catch(e){ console.error(e); closeModal(); toast(e.message || String(e), 'bad'); }
+}
+// Matrix sheet-ийн томьёо бүх ажилтныг хамраагүй (жагсаалтын сүүлийн хүмүүс дутуу) үед
+// MatrixHelper/Sheet1-ийн ажилтны жагсаалт + Qualification-ээс дутуу мөрүүдийг нөхнө (Excel-ийн MAXIFS томьёотой ижил логик)
+function fillMatrixGaps(sheets, si){
+  const ID = /^(employeeid|workerid|empid|sap|код)$/, rows = sheets[si].rows;
+  const findHead = (rs, need) => { for(let h = 0; h < Math.min(8, rs.length); h++){ const k = rs[h].map(normKey); const idx = need.map(re => k.findIndex(x => re.test(x))); if(idx.every(i => i >= 0)) return { h, idx }; } return null; };
+  const M = findHead(rows, [ID]); if(!M) return [];
+  const head = rows[M.h].map(cellStr), hk = head.map(normKey), idC = M.idx[0];
+  const colOf = re => hk.findIndex(x => re.test(x));
+  const wC = colOf(/^(worker|name|овогнэр|нэр)$/), dC = colOf(/^(department|dept|алба)$/), pC = colOf(/^(position|албантушаал)$/);
+  const have = new Set(rows.slice(M.h + 1).map(r => codeK(r[idC])).filter(Boolean));
+  let list = null, Q = null;
+  const order = sheets.map((sh, i) => i).filter(i => i !== si).sort((a, b) => /helper/i.test(sheets[b].name) - /helper/i.test(sheets[a].name));
+  order.forEach(i => { const sh = sheets[i];
+    if(!list){ const H = findHead(sh.rows, [ID, /^(worker|name)$/, /^department$/]); if(H){ const pI = sh.rows[H.h].map(normKey).findIndex(x => x === 'position');
+      list = sh.rows.slice(H.h + 1).map(r => ({ id:cellStr(r[H.idx[0]]), name:cellStr(r[H.idx[1]]), dept:cellStr(r[H.idx[2]]), pos:pI >= 0 ? cellStr(r[pI]) : '' })).filter(x => x.id && x.name); } }
+    if(!Q){ const H = findHead(sh.rows, [ID, /^(program|training|course)/, /^(expirationdate|expirydate|expires?)$/]); if(H){ Q = new Map();
+      for(const r of sh.rows.slice(H.h + 1)){ const e = cellDate(r[H.idx[2]]); if(!e) continue; const k = codeK(r[H.idx[0]]) + '|' + normKey(r[H.idx[1]]); if(!Q.has(k) || Q.get(k) < e) Q.set(k, e); } } }
+  });
+  if(!list) return [];
+  const added = [];
+  for(const p of list){ const k = codeK(p.id); if(!k || have.has(k)) continue; have.add(k);
+    const row = head.map(() => '');
+    row[idC] = p.id; if(wC >= 0) row[wC] = p.name; if(dC >= 0) row[dC] = p.dept; if(pC >= 0) row[pC] = p.pos;
+    if(Q) head.forEach((h, c) => { if(!h || c === idC || c === wC || c === dC || c === pC) return; const v = Q.get(k + '|' + hk[c]); if(v) row[c] = v; });
+    rows.push(row); added.push(cleanName(p.name));
+  }
+  return added;
 }
 function parseCurrent(){
   const im = S.imp; im.err = null;
@@ -2189,6 +2218,7 @@ function renderImport(){
     ${pl.newTypes.length ? `<div class="field"><span class="lbl-s">Шинэ сургалтын төрөл — хүчинтэй хугацаа (сар)</span>${pl.newTypes.map(n => `<div class="set-row two"><span>${esc(n.name)}</span><input class="inp mono" type="number" min="1" style="width:90px" value="${n.months}" data-imp="months" data-k="${esc(normKey(n.name))}" aria-label="${esc(n.name)} сар"></div>`).join('')}</div>` : ''}
     ${pl.skipPos ? `<p class="note" style="margin:0">Албан тушаалд хамааралгүй ${pl.skipPos} бичлэгийг алгассан (жишээ нь Level 2 Isolation → зөвхөн Electrician).</p>` : ''}
     ${im.qual ? `<p class="note">Хамрагдсан огноо, хүчинтэй хугацааг <b>${esc(im.qual.sheet)}</b> sheet-ээс тулгаж авлаа (${pl.fromQual} бичлэг).${pl.typeFix.length ? ` ${pl.typeFix.length} сургалтын хүчинтэй хугацаа засагдана.` : ''}</p>` : ''}
+    ${im.added?.length && im.si === im.sheets.findIndex(sh => /^\s*matrix\s*$/i.test(sh.name)) ? `<p class="note">Matrix sheet-д дутуу байсан <b>${im.added.length}</b> ажилтныг MatrixHelper + Qualification-ээс нөхлөө: ${im.added.map(esc).join(', ')}</p>` : ''}
     ${pl.newDepts.length ? `<p class="note">Шинэ алба үүснэ: ${pl.newDepts.map(esc).join(', ')}</p>` : ''}
     ${pl.deact.length ? `<label class="check"><input type="checkbox" data-imp="deactivate" ${im.deactivate ? 'checked' : ''}>Файлд байхгүй <b>${pl.deact.length}</b> ажилтныг "ажлаас гарсан" болгох</label>` : ''}
     ${P.isLong && P.older ? `<p class="note" style="margin:0">Хүн × сургалт бүрээс <b>хамгийн сүүлийн</b> бичлэгийг авсан (${P.older} хуучин бичлэгийг алгассан).</p>` : ''}
