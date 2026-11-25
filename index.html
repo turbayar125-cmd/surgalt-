@@ -509,8 +509,8 @@ const CONFIG = {
 const DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
 const sb = (!DEMO && window.supabase) ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY) : null;
 
-const APP_VER = '2026.11.08a';
-const TABLES = { news_posts:'news', booking_items:'bitems', training_bookings:'books', departments:'depts', employees:'emps', training_types:'types', trainings:'trs', reminder_log:'logs', org_nodes:'nodes' };
+const APP_VER = '2026.11.25';
+const TABLES = { news_posts:'news', booking_items:'bitems', training_bookings:'books', departments:'depts', employees:'emps', training_types:'types', trainings:'trs', reminder_log:'logs', org_nodes:'nodes', deleted_trainings:'dels' };
 const S = {
   ready:false, auth:null, user:null, view:'dash',
   depts:[], emps:[], types:[], trs:[], logs:[],
@@ -708,7 +708,7 @@ async function fetchAll(table){
   return out;
 }
 async function loadAll(){
-  if(DEMO){ S.extra = true; seedDemo(); S.imports = []; S.nodes = []; S.books = []; S.bitems = []; S.biMark = true; S.licLog = []; S.hasProof = true; S.hasPosRule = true; S.hasBook = true; S.news = []; S.hasNews = true; S.hasLicFlag = true; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
+  if(DEMO){ S.extra = true; seedDemo(); S.imports = []; S.nodes = []; S.books = []; S.bitems = []; S.biMark = true; S.licLog = []; S.hasProof = true; S.hasPosRule = true; S.hasBook = true; S.news = []; S.hasNews = true; S.hasLicFlag = true; S.dels = []; S.hasDel = true; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
   const [d,e,t,tr] = await Promise.all(['departments','employees','training_types','trainings'].map(fetchAll));
   const l = await sb.from('reminder_log').select('*').order('sent_at',{ascending:false}).limit(2000);
   const s = await sb.from('settings').select('*').eq('id',1).maybeSingle();
@@ -733,6 +733,7 @@ async function loadAll(){
   { const t = await sb.from('trainings').select('proof_url').limit(1); S.hasProof = !t.error; }
   S.hasPosRule = S.types.length ? 'only_positions' in S.types[0] : !(await sb.from('training_types').select('only_positions').limit(1)).error;
   try{ S.nodes = await fetchAll('org_nodes'); } catch(e){ console.warn('org_nodes:', e.message); S.nodes = []; }
+  try{ S.dels = await fetchAll('deleted_trainings'); S.hasDel = true; } catch(e){ console.warn('deleted_trainings:', e.message); S.dels = []; S.hasDel = false; }
   { const l = await sb.from('license_mail_log').select('*').order('sent_at', { ascending:false }).limit(20); S.licLog = l.error ? null : l.data; }
   const il = await sb.from('import_log').select('id,at,file,by_email,summary,data,undone_at').order('at', { ascending:false }).limit(15);
   S.imports = il.error ? [] : il.data;
@@ -750,6 +751,38 @@ async function dbUpdate(table, id, patch){
   if(DEMO) row = { ...list[i], ...patch };
   else { const { data, error } = await sb.from(table).update(patch).eq('id', id).select().single(); if(error) throw error; row = data; }
   if(i >= 0) list[i] = row; reindex(); return row;
+}
+// Устгасан сургалтыг "Устгасан сургалт" хэсэгт хадгалаад устгана. Excel импорт тэдгээрийг дахин оруулахгүй.
+async function archiveTrainings(rows, reason){
+  rows = rows.filter(Boolean); if(!rows.length) return;
+  if(!S.hasDel) throw new Error('Устгасан сургалтын хүснэгт алга. Supabase SQL Editor дээр шинэ setup.sql-ийг ажиллуулна уу.');
+  await dbInsert('deleted_trainings', rows.map(t => ({ employee_id:t.employee_id, training_type_id:t.training_type_id, completed_on:t.completed_on, expires_on:t.expires_on, data:t, reason:reason || null, by_email:S.user?.email || null, deleted_at:new Date().toISOString() })));
+  await dbDeleteMany('trainings', rows.map(t => t.id));
+}
+async function restoreTrainings(dels){
+  const rows = dels.map(d => { const x = { ...(d.data || {}) }; delete x.id; delete x.created_at; delete x.status; delete x.days;
+    return { employee_id:d.employee_id, training_type_id:d.training_type_id, completed_on:d.completed_on, expires_on:d.expires_on, certificate_no:x.certificate_no ?? null, provider:x.provider ?? null, notes:x.notes ?? null, ...(S.hasProof ? { proof_url:x.proof_url ?? null } : {}) }; });
+  await dbInsert('trainings', rows); await dbDeleteMany('deleted_trainings', dels.map(d => d.id));
+}
+const delBlocks = (empId, typeId, exp) => (S.dels || []).some(d => d.employee_id === empId && d.training_type_id === typeId && (!exp || d.expires_on >= exp));
+const delGroups = list => { const m = new Map(); for(const d of list){ const k = d.employee_id + '|' + d.training_type_id; if(!m.has(k)) m.set(k, []); m.get(k).push(d); }
+  return [...m.values()].map(g => g.sort((a, b) => (b.expires_on || '').localeCompare(a.expires_on || ''))).sort((a, b) => (b[0].deleted_at || '').localeCompare(a[0].deleted_at || '')); };
+function delList(list, showEmp){
+  const gs = delGroups(list); if(!gs.length) return '<div class="empty">Устгасан сургалт алга.</div>';
+  return gs.map(g => { const d = g[0], e = IDX.emp.get(d.employee_id);
+    return `<div class="tr-card"><div style="min-width:0"><div class="tr-name">${esc(typeName(d.training_type_id))}${showEmp && e ? ` <span class="muted" style="font-weight:400">· ${esc(e.full_name)} · ${esc(deptName(e.department_id))}</span>` : ''}</div>
+      <div class="tr-meta"><span>Хамрагдсан <span class="mono">${fmtDate(d.completed_on)}</span></span><span>Дуусах <span class="mono">${fmtDate(d.expires_on)}</span></span>${g.length > 1 ? `<span>+${g.length - 1} өмнөх бичлэг</span>` : ''}</div>
+      <div class="tr-meta"><span>Устгасан <span class="mono">${fmtDate(String(d.deleted_at || '').slice(0, 10))}</span></span>${d.by_email ? `<span>${esc(d.by_email)}</span>` : ''}${d.reason ? `<span>Шалтгаан: ${esc(d.reason)}</span>` : ''}</div></div>
+      <div>${chip('plain', 'Устгасан')}</div>
+      <div class="tr-act"><button class="btn btn-sm" data-act="restore-tr" data-ids="${g.map(x => x.id).join(',')}">Сэргээх</button></div></div>`; }).join('');
+}
+function delModal(){
+  const q = (S.delQ || '').trim().toLowerCase();
+  const list = (S.dels || []).filter(d => { const e = IDX.emp.get(d.employee_id); if(!e) return false; if(!q) return true;
+    return [e.full_name, e.emp_code, typeName(d.training_type_id), deptName(e.department_id)].some(v => String(v || '').toLowerCase().includes(q)); });
+  openModal({ title:`Устгасан сургалт (${delGroups(S.dels || []).length})`, wide:true, body:`<p class="note" style="margin:0">Энд байгаа сургалтыг Excel импорт дахин оруулахгүй. Хэрэв ажилтан тухайн сургалтад дахин хамрагдаж, Excel-д <b>шинэ (илүү хожуу) огноо</b> гарвал автоматаар буцаж орно.</p>
+    <input class="inp search" type="search" placeholder="Нэр, код, сургалт, алба" value="${esc(S.delQ || '')}" data-delq aria-label="Хайх" style="margin:10px 0">
+    <div class="tr-list" id="del-list">${delList(list, true)}</div>` });
 }
 async function dbDelete(table, id){
   if(!DEMO){ const { error } = await sb.from(table).delete().eq('id', id); if(error) throw error; }
@@ -1247,7 +1280,7 @@ function listEmps(){
 function viewTrs(){
   const f = S.tf;
   return `<div class="page-head"><div><h1>Сургалтын бүртгэл</h1><p>Ажилтан бүрийн сургалт тус бүрийн хамгийн сүүлийн бичлэг</p></div>
-    <div class="actions">${importBtn()}<button class="btn" data-act="export">CSV экспорт</button><button class="btn btn-primary" data-act="bulk">Олноор бүртгэх</button></div></div>
+    <div class="actions">${importBtn()}<button class="btn" data-act="export">CSV экспорт</button>${S.hasDel ? `<button class="btn" data-act="del-list">Устгасан сургалт${(S.dels || []).length ? ` (${delGroups(S.dels).length})` : ''}</button>` : ''}<button class="btn btn-primary" data-act="bulk">Олноор бүртгэх</button></div></div>
   <div class="toolbar">
     <input class="inp search" id="tf-q" type="search" placeholder="Нэр, код, гэрчилгээний дугаар" value="${esc(f.q)}" data-filter="tf" data-key="q" aria-label="Хайх">
     <select class="inp" id="tf-dept" data-filter="tf" data-key="dept" aria-label="Алба"><option value="">Бүх алба</option>${sortedDepts().map(d => `<option value="${d.id}" ${f.dept==d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select>
@@ -1782,7 +1815,8 @@ function profileBody(id){
   ${reps.length ? `<div><h4 style="font-size:14px;margin-bottom:8px">Шууд харьяалагдах (${reps.length})</h4><div class="chips-row">${reps.map(r => `<button class="pchip" data-act="profile" data-id="${r.id}">${avatar(r,'sm')}${esc(r.full_name)}</button>`).join('')}</div></div>` : ''}
   <div class="sec-head"><h4>Сургалтууд (${cur.length})</h4><button class="btn btn-sm btn-primary" data-act="new-tr" data-emp="${id}">+ Сургалт нэмэх</button></div>
   <div class="tr-list">${cur.length ? cur.map(c => trCard(c, true)).join('') : '<div class="empty">Сургалт бүртгэгдээгүй байна.</div>'}</div>
-  ${old.length ? `<details class="hist"><summary>Өмнөх бичлэгүүд (${old.length})</summary><div class="tr-list" style="margin-top:8px">${old.map(t => trCard(t, false)).join('')}</div></details>` : ''}`;
+  ${old.length ? `<details class="hist"><summary>Өмнөх бичлэгүүд (${old.length})</summary><div class="tr-list" style="margin-top:8px">${old.map(t => trCard(t, false)).join('')}</div></details>` : ''}
+  ${(() => { const dl = (S.dels || []).filter(d => d.employee_id === id); return dl.length ? `<details class="hist"><summary>Устгасан сургалт (${delGroups(dl).length})</summary><div class="tr-list" style="margin-top:8px">${delList(dl, false)}</div></details>` : ''; })()}`;
 }
 const isPdf = u => /\.pdf(\?|$)/i.test(u || '');
 const proofThumb = u => isPdf(u) ? `<a class="proof pdf" href="${esc(u)}" target="_blank" rel="noopener" title="Баталгаажуулах файл">📄 PDF</a>` : `<a class="proof" href="${esc(u)}" target="_blank" rel="noopener" title="Баталгаажуулах зураг"><img src="${esc(u)}" alt="" loading="lazy"></a>`;
@@ -2120,6 +2154,7 @@ function planImport(P, opt){
     if(exp < done || (P.isLong && exp === done && x.done && x.exp)){ if(P.isLong){ exp = addMonths(done, m || 12); out.fixedExp = (out.fixedExp || 0) + 1; } else { out.errors.push(`${x.line}-р мөр: "${x.type}" дуусах огноо хамрагдсанаас өмнө байна`); continue; } }
     const dk = (who._new ? 'n' + out.empNew.indexOf(who) : who.id) + '|' + tk + '|' + done;
     if(seen.has(dk)) continue; seen.add(dk);
+    if(!who._new && !t._new && delBlocks(who.id, t.id, exp)){ out.recDel = (out.recDel || 0) + 1; continue; } // устгасан сургалт — дахин оруулахгүй
     if(!who._new && !t._new){
       const ex = S.trs.filter(r => r.employee_id === who.id && r.training_type_id === t.id);
       if(ex.some(r => r.completed_on === done || r.expires_on === exp)){ out.recSame++; continue; }
@@ -2216,6 +2251,7 @@ function renderImport(){
       <label class="check"><input type="radio" name="imp-mode" value="exp" data-imp="mode" ${im.mode === 'exp' ? 'checked' : ''}>Дуусах (хүчинтэй) огноо</label>
       ${im.mode === P.guess ? '<span class="note">· огноонуудаас автоматаар таамагласан</span>' : ''}</div></div>` : ''}
     ${pl.newTypes.length ? `<div class="field"><span class="lbl-s">Шинэ сургалтын төрөл — хүчинтэй хугацаа (сар)</span>${pl.newTypes.map(n => `<div class="set-row two"><span>${esc(n.name)}</span><input class="inp mono" type="number" min="1" style="width:90px" value="${n.months}" data-imp="months" data-k="${esc(normKey(n.name))}" aria-label="${esc(n.name)} сар"></div>`).join('')}</div>` : ''}
+    ${pl.recDel ? `<p class="note" style="margin:0">"Устгасан сургалт" хэсэгт байгаа <b>${pl.recDel}</b> бичлэгийг дахин оруулсангүй.</p>` : ''}
     ${pl.skipPos ? `<p class="note" style="margin:0">Албан тушаалд хамааралгүй ${pl.skipPos} бичлэгийг алгассан (жишээ нь Level 2 Isolation → зөвхөн Electrician).</p>` : ''}
     ${im.qual ? `<p class="note">Хамрагдсан огноо, хүчинтэй хугацааг <b>${esc(im.qual.sheet)}</b> sheet-ээс тулгаж авлаа (${pl.fromQual} бичлэг).${pl.typeFix.length ? ` ${pl.typeFix.length} сургалтын хүчинтэй хугацаа засагдана.` : ''}</p>` : ''}
     ${im.added?.length && im.si === im.sheets.findIndex(sh => /^\s*matrix\s*$/i.test(sh.name)) ? `<p class="note">Matrix sheet-д дутуу байсан <b>${im.added.length}</b> ажилтныг MatrixHelper + Qualification-ээс нөхлөө: ${im.added.map(esc).join(', ')}</p>` : ''}
@@ -2338,7 +2374,15 @@ const ACT = {
   'edit-tr': a => { const t = S.trs.find(x => x.id === Number(a.dataset.id)); S.openEmp = null; openModal({ title:'Сургалт засах', body:trForm(t) }); },
   renew: a => { const t = S.trs.find(x => x.id === Number(a.dataset.id)); const tt = IDX.type.get(t.training_type_id); const d = todayStr(); S.openEmp = null;
     openModal({ title:'Сургалт сунгах', body:`<p class="note" style="margin:0">Шинэ бичлэг үүснэ. Өмнөх нь түүхэнд хадгалагдана.</p>`+trForm({ employee_id:t.employee_id, training_type_id:t.training_type_id, completed_on:d, expires_on:addMonths(d, tt.validity_months), provider:t.provider }) }); },
-  'del-tr': async a => { const t = S.trs.find(x => x.id === Number(a.dataset.id)); if(!await askConfirm(`${typeName(t.training_type_id)} (${fmtDate(t.completed_on)}) бичлэгийг устгах уу?`)) return; await run(async () => { await dbDelete('trainings', t.id); refresh(); }, 'Бичлэг устгагдлаа'); },
+  'del-tr': async a => { const t = S.trs.find(x => x.id === Number(a.dataset.id)); const all = S.trs.filter(x => x.employee_id === t.employee_id && x.training_type_id === t.training_type_id);
+    const latest = all.reduce((m, x) => !m || x.expires_on > m.expires_on ? x : m, null), rows = latest.id === t.id ? all : [t];
+    if(!await askConfirm(`"${typeName(t.training_type_id)}" сургалтыг ${IDX.emp.get(t.employee_id)?.full_name || ''}-аас устгах уу?${rows.length > 1 ? ` (${rows.length} бичлэг)` : ''} Энэ нь "Устгасан сургалт" хэсэгт хадгалагдаж, Excel импортоор дахин орж ирэхгүй.`)) return;
+    await run(async () => { await archiveTrainings(rows, 'Гараар устгасан'); refresh(); }, 'Устгасан сургалт хэсэгт шилжлээ'); },
+  'del-list': () => { S.delQ = ''; S.openEmp = null; delModal(); },
+  'restore-tr': async a => { const ids = new Set(a.dataset.ids.split(',').map(Number)), g = S.dels.filter(d => ids.has(d.id)); if(!g.length) return;
+    if(!await askConfirm(`"${typeName(g[0].training_type_id)}" сургалтыг ${IDX.emp.get(g[0].employee_id)?.full_name || ''}-д буцааж сэргээх үү?`, 'Сэргээх')) return;
+    const inModal = !!document.getElementById('del-list');
+    await run(async () => { await restoreTrainings(g); if(inModal) delModal(); else refresh(); }, 'Сэргээгдлээ'); },
   bulk: () => { if(!S.types.length) return toast('Эхлээд сургалтын төрөл нэмнэ үү','bad'); S.openEmp = null; openModal({ title:'Олноор бүртгэх', wide:true, body:bulkForm() }); },
   'bulk-all': () => { const vis = $$('.pick-list label').filter(l => !l.hidden); const all = vis.every(l => l.querySelector('input').checked); vis.forEach(l => l.querySelector('input').checked = !all); updBulkCount(); },
   export: () => exportCSV(),
@@ -2358,7 +2402,7 @@ const ACT = {
   'bp-apply': a => applyBulkPhotos(a),
   'type-clean': async a => { const t = IDX.type.get(Number(a.dataset.id)); const ids = S.trs.filter(r => r.training_type_id === t.id && !typeAllowed(t, IDX.emp.get(r.employee_id))).map(r => r.id);
     if(!await askConfirm(`"${t.name}" сургалтын ${ids.length} бичлэгийг (${t.only_positions}-аас бусад албан тушаалтай хүмүүсийнх) бүрмөсөн устгах уу?`, 'Устгах')) return;
-    await run(() => dbDeleteMany('trainings', ids), `${ids.length} бичлэг устгагдлаа`); render(); },
+    await run(() => S.hasDel ? archiveTrainings(S.trs.filter(r => ids.includes(r.id)), `Албан тушаалд хамааралгүй (${t.only_positions})`) : dbDeleteMany('trainings', ids), `${ids.length} бичлэг устгагдлаа`); render(); },
   'lic-add': () => { S.openEmp = null; openModal({ title:'Үнэмлэх нэмэх', wide:true, body:trForm({}, { lic:true }) }); },
   'lic-edit': a => { const t = S.trs.find(x => x.id === Number(a.dataset.id)); S.openEmp = null; openModal({ title:'Үнэмлэх засах', wide:true, body:trForm(t, { lic:true }) }); },
   'lic-renew': a => { const t = S.trs.find(x => x.id === Number(a.dataset.id)); const tt = IDX.type.get(t.training_type_id); const d = todayStr(); S.openEmp = null;
@@ -2438,7 +2482,7 @@ const ACT = {
     Object.assign(S, { ready:false, auth:'login', user:null, admin:false, admins:[], imports:[], depts:[], emps:[], trs:[], types:[], logs:[], view:'dash', org:null });
     closeModal(); document.body.classList.remove('ro'); render(); toast('Системээс гарлаа'); }
 };
-const ADMIN_ACTS = new Set(['type-clean','lic-add','lic-edit','lic-renew','lic-send','lic-prev','news-new','news-edit','news-del','lic-types','bk-new','bk-item','bk-set','bk-rm','bk-cancel','bk-done','bim-apply','bp-apply','undo-imp','wipe-all','new-emp','edit-emp','del-emp','new-tr','edit-tr','renew','del-tr','bulk','bulk-all','send-now','tpl-ins','tpl-reset','del-dept','del-type','pick-photo','imp-apply','del-admin']);
+const ADMIN_ACTS = new Set(['type-clean','lic-add','lic-edit','lic-renew','lic-send','lic-prev','news-new','news-edit','news-del','lic-types','bk-new','bk-item','bk-set','bk-rm','bk-cancel','bk-done','bim-apply','bp-apply','undo-imp','wipe-all','new-emp','edit-emp','del-emp','new-tr','edit-tr','renew','del-tr','restore-tr','bulk','bulk-all','send-now','tpl-ins','tpl-reset','del-dept','del-type','pick-photo','imp-apply','del-admin']);
 const denied = () => { toast('Танд засах эрх алга. Админтай холбогдоно уу.','bad'); };
 document.addEventListener('click', ev => { const a = ev.target.closest('[data-act]'); if(!a) return; if(!S.admin && ADMIN_ACTS.has(a.dataset.act)){ ev.preventDefault(); return denied(); } const f = ACT[a.dataset.act]; if(f){ if(a.tagName === 'A') ev.preventDefault(); f(a, ev); } });
 document.addEventListener('keydown', ev => {
@@ -2455,6 +2499,8 @@ document.addEventListener('drop', ev => { const z = ev.target.closest?.('[data-d
 function updBulkCount(){ const n = $$('.pick-list input:checked').length; const c = $('#b-count'); if(c) c.textContent = `${n} сонгосон`; }
 document.addEventListener('focusin', ev => { if(ev.target.id === 'tp-subj') S.tplFocus = 'subj'; else if(ev.target.id === 'tp-body') S.tplFocus = 'body'; });
 document.addEventListener('input', ev => {
+  if('delq' in ev.target.dataset){ S.delQ = ev.target.value; const q = S.delQ.trim().toLowerCase(); const l = $('#del-list');
+    if(l) l.innerHTML = delList((S.dels || []).filter(d => { const e = IDX.emp.get(d.employee_id); return e && (!q || [e.full_name, e.emp_code, typeName(d.training_type_id), deptName(e.department_id)].some(v => String(v || '').toLowerCase().includes(q))); }), true); return; }
   const t = ev.target;
   if(t.form?.dataset.form === 'mail-tpl') updTplPreview();
   if(t.dataset.filter){ const o = S[t.dataset.filter]; o[t.dataset.key] = t.type === 'checkbox' ? t.checked : t.value; $('#list').innerHTML = t.dataset.filter === 'ef' ? listEmps() : t.dataset.filter === 'lf' ? listLic() : listTrs(); }
