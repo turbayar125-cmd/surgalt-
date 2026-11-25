@@ -260,7 +260,7 @@ button.mk{cursor:pointer;font-size:12px;padding:3px 10px}
 /* Харах эрхтэй хэрэглэгчид засах товчнуудыг нууна */
 body.ro [data-act="new-emp"],body.ro [data-act="edit-emp"],body.ro [data-act="del-emp"],body.ro [data-act="new-tr"],body.ro [data-act="edit-tr"],
 body.ro [data-act="del-tr"],body.ro [data-act="renew"],body.ro [data-act="bulk"],body.ro [data-act="send-now"],body.ro [data-act="del-dept"],
-body.ro [data-act="del-type"],body.ro [data-act="del-admin"],body.ro label:has(> input[data-import]),body.ro label:has(> input[data-bulkphoto]),body.ro label:has(> input[data-bookimport]),body.ro label:has(> input[data-photo]),
+body.ro [data-act="del-type"],body.ro [data-act="del-admin"],body.ro label:has(> input[data-import]),body.ro label:has(> input[data-bulkphoto]),body.ro label:has(> input[data-bookimport]),body.ro label:has(> input[data-ghimport]),body.ro label:has(> input[data-photo]),
 body.ro .tbl td.num:has([data-act="renew"]),body.ro .tr-act,body.ro .drop,body.ro .prof-top .actions{display:none!important}
 .role{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;border-radius:999px;padding:2px 9px;align-self:flex-start}
 .role.adm{background:#2a3a58;color:#cfe0ff} .role.view{background:#22303a;color:#bfe3cf}
@@ -303,6 +303,19 @@ body.ro .tbl td.num:has([data-act="renew"]),body.ro .tr-act,body.ro .drop,body.r
 
 /* tables */
 .tbl-wrap{overflow-x:auto}
+/* Ногоон малгай */
+.gh-ic{display:inline-flex;vertical-align:-3px;margin-right:4px;flex:none}
+.obox.gh{background:rgba(47,158,91,.13);border-color:#2f9e5b}
+.obox.gh::before{background:#2f9e5b}
+.obox.gh .ob-title{color:#23824a}
+.gh-st{display:inline-flex;flex-direction:column;gap:1px;font-size:12px;line-height:1.25;white-space:nowrap;padding:4px 8px;border-radius:8px;border:1px solid var(--line)}
+.gh-st b{font-weight:600}
+.gh-st.done{background:rgba(47,158,91,.12);border-color:rgba(47,158,91,.35);color:#23824a}
+.gh-st.late{background:rgba(214,64,64,.10);border-color:rgba(214,64,64,.35);color:var(--bad)}
+.gh-st.soon{background:rgba(224,160,40,.12);border-color:rgba(224,160,40,.4);color:#a26b00}
+.gh-st.wait{color:var(--muted)}
+.tbl tr.gh-white td{opacity:.6}
+.gh-tbl td:nth-child(2){min-width:190px} .gh-tbl td:nth-child(3){min-width:140px} .gh-tbl td:nth-child(4){white-space:nowrap}
 table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
 .tbl th{text-align:left;font-size:12px;font-weight:600;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--surface)}
 .tbl td{padding:9px 12px;border-bottom:1px solid var(--line-2);vertical-align:middle}
@@ -509,8 +522,8 @@ const CONFIG = {
 const DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
 const sb = (!DEMO && window.supabase) ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY) : null;
 
-const APP_VER = '2026.11.25';
-const TABLES = { news_posts:'news', booking_items:'bitems', training_bookings:'books', departments:'depts', employees:'emps', training_types:'types', trainings:'trs', reminder_log:'logs', org_nodes:'nodes', deleted_trainings:'dels' };
+const APP_VER = '2026.11.26';
+const TABLES = { news_posts:'news', booking_items:'bitems', training_bookings:'books', departments:'depts', employees:'emps', training_types:'types', trainings:'trs', reminder_log:'logs', org_nodes:'nodes', deleted_trainings:'dels', green_hats:'gh' };
 const S = {
   ready:false, auth:null, user:null, view:'dash',
   depts:[], emps:[], types:[], trs:[], logs:[],
@@ -554,6 +567,10 @@ const warnDays = () => { const d = S.settings.reminder_days || []; return d.leng
 const statusOf = d => d < 0 ? 'bad' : d <= warnDays() ? 'warn' : 'ok';
 const ST = { ok:'Хүчинтэй', warn:'Дуусах дөхсөн', bad:'Хугацаа дууссан', none:'Сургалтгүй' };
 const chip = (st, txt) => `<span class="chip chip-${st}">${esc(txt ?? ST[st])}</span>`;
+// Ногоон каск дүрс
+const GH_ICON = (sz = 16) => `<svg class="gh-ic" width="${sz}" height="${sz}" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 16.5a8.5 8.5 0 0 1 17 0z" fill="#2f9e5b"/><path d="M9.5 9V6.2a2.5 2.5 0 0 1 5 0V9" fill="#3fb86f"/><path d="M12 4v12" stroke="#23824a" stroke-width="1.2"/><rect x="1.5" y="16" width="21" height="3" rx="1.5" fill="#23824a"/></svg>`;
+const isGH = id => !!(id && S.ghActive?.has(id));
+const ghName = e => (isGH(e.id) ? `<span title="Ногоон малгай">${GH_ICON()}</span>` : '') + esc(e.full_name);
 function daysText(d){ if(d > 3650) return 'Хугацаагүй'; if(d < 0) return `${-d} хоног хэтэрсэн`; if(d === 0) return 'Өнөөдөр дуусна'; return `${d} хоног үлдсэн`; }
 
 function reindex(){
@@ -571,6 +588,7 @@ function reindex(){
   IDX.current = [...cur.values()].filter(t => IDX.emp.has(t.employee_id) && IDX.type.has(t.training_type_id)).map(t => ({ ...t, days:daysUntil(t.expires_on) }))
     .filter(t => { if(lim > 0 && t.days < -lim){ IDX.hidden++; return false; } return typeAllowed(IDX.type.get(t.training_type_id), IDX.emp.get(t.employee_id)); })
     .map(t => { IDX.currentIds.add(t.id); return { ...t, status: statusOf(t.days) }; });
+  S.ghActive = new Set((S.gh || []).filter(g => g.employee_id && !ghDone(g)).map(g => g.employee_id));
   IDX.byEmp = new Map();
   for(const c of IDX.current){ if(!IDX.byEmp.has(c.employee_id)) IDX.byEmp.set(c.employee_id, []); IDX.byEmp.get(c.employee_id).push(c); }
 }
@@ -708,7 +726,7 @@ async function fetchAll(table){
   return out;
 }
 async function loadAll(){
-  if(DEMO){ S.extra = true; seedDemo(); S.imports = []; S.nodes = []; S.books = []; S.bitems = []; S.biMark = true; S.licLog = []; S.hasProof = true; S.hasPosRule = true; S.hasBook = true; S.news = []; S.hasNews = true; S.hasLicFlag = true; S.dels = []; S.hasDel = true; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
+  if(DEMO){ S.extra = true; seedDemo(); S.imports = []; S.nodes = []; S.books = []; S.bitems = []; S.biMark = true; S.licLog = []; S.hasProof = true; S.hasPosRule = true; S.hasBook = true; S.news = []; S.hasNews = true; S.hasLicFlag = true; S.dels = []; S.hasDel = true; S.gh = demoGreen(); S.hasGh = true; S.admin = true; S.admins = [{ email:'turbayar125@gmail.com' }]; return; }
   const [d,e,t,tr] = await Promise.all(['departments','employees','training_types','trainings'].map(fetchAll));
   const l = await sb.from('reminder_log').select('*').order('sent_at',{ascending:false}).limit(2000);
   const s = await sb.from('settings').select('*').eq('id',1).maybeSingle();
@@ -734,6 +752,7 @@ async function loadAll(){
   S.hasPosRule = S.types.length ? 'only_positions' in S.types[0] : !(await sb.from('training_types').select('only_positions').limit(1)).error;
   try{ S.nodes = await fetchAll('org_nodes'); } catch(e){ console.warn('org_nodes:', e.message); S.nodes = []; }
   try{ S.dels = await fetchAll('deleted_trainings'); S.hasDel = true; } catch(e){ console.warn('deleted_trainings:', e.message); S.dels = []; S.hasDel = false; }
+  try{ S.gh = await fetchAll('green_hats'); S.hasGh = true; } catch(e){ console.warn('green_hats:', e.message); S.gh = []; S.hasGh = false; }
   { const l = await sb.from('license_mail_log').select('*').order('sent_at', { ascending:false }).limit(20); S.licLog = l.error ? null : l.data; }
   const il = await sb.from('import_log').select('id,at,file,by_email,summary,data,undone_at').order('at', { ascending:false }).limit(15);
   S.imports = il.error ? [] : il.data;
@@ -943,6 +962,7 @@ function seedDemo(){
 
 /* ---------- icons ---------- */
 const I = {
+  green:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16a8 8 0 0 1 16 0"/><path d="M9.5 9V6a2.5 2.5 0 0 1 5 0v3"/><path d="M2 16h20v3H2z"/></svg>',
   dash:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>',
   emps:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6"/><path d="M16 4a4 4 0 0 1 0 8M22 21c0-3-1.5-5-4-5.7"/></svg>',
   news:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h13v14a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2z"/><path d="M17 9h3v10a2 2 0 0 1-2 2"/><path d="M8 9h5M8 13h5M8 17h3"/></svg>',
@@ -967,7 +987,7 @@ function render(){
   const bad = activeCurrent().filter(c => c.status === 'bad').length;
   document.body.classList.toggle('ro', !S.admin);
   if(!S.admin && S.view === 'settings') S.view = 'dash';
-  const nav = [['dash','Хянах самбар'],['org','Алба'],['emps','Ажилтнууд'],['trs','Сургалтын бүртгэл'],['book','Сургалт захиалга'],['lic','Эрхийн үнэмлэх'],['news','Мэдээ мэдээлэл'], ...(S.admin ? [['settings','Тохиргоо']] : [])];
+  const nav = [['dash','Хянах самбар'],['org','Алба'],['emps','Ажилтнууд'],['green','Ногоон малгай'],['trs','Сургалтын бүртгэл'],['book','Сургалт захиалга'],['lic','Эрхийн үнэмлэх'],['news','Мэдээ мэдээлэл'], ...(S.admin ? [['settings','Тохиргоо']] : [])];
   app.innerHTML = `<div class="shell">
     <aside class="side">
       <div class="brand"><img class="brand-logo" src="logo-dark.png" alt="Premium"><img class="brand-mark-img" src="logo-mark.png" alt="Premium"><span class="brand-app">Сургалтын бүртгэл</span></div>
@@ -981,6 +1001,107 @@ function render(){
 }
 const demoBar = () => `<div class="demo-bar"><b>Демо горим.</b><span>Жишээ 150 ажилтантай. Өөрчлөлт хадгалагдахгүй, имэйл илгээгдэхгүй. Жинхэнээр ажиллуулах заавар: GitHub дээрх README файл.</span></div>`;
 
+/* --- Ногоон малгай (шинэ ажилтны хөтөлбөр) --- */
+// Алхам: [түлхүүр, нэр, эхэлснээс хойших хоног, Excel-ийн баганыг таних]
+const GH_STEPS = [
+  ['intro', 'Танилцуулга', 0, /introduction|greenhardhatprogram/],
+  ['d30', '30 хоног', 30, /firstroster|30$/],
+  ['d60', '60 хоног', 60, /processsafety|60$/],
+  ['d90', '90 хоног · VOC', 90, /voc|90$/],
+  ['test', 'Цагаан малгайн шалгалт', 90, /whitehardhattest|test/],
+  ['conf', 'White hat confirmed', 90, /whitehatconfirm|confirmed/],
+];
+const ghVal = (g, k) => (g.steps || {})[k] || '';
+const ghIsDone = v => { const k = normKey(v); return !!k && !/^(noaction|no|pending|хийгдээгүй|-|0)$/.test(k) && (/complet|done|yes|pass|тэнцсэн|хийгдсэн|дууссан/.test(k) || /^\d{4}-\d{2}-\d{2}$/.test(String(v))); };
+const ghDone = g => ghIsDone(ghVal(g, 'conf'));
+const ghState = (g, st) => { const v = ghVal(g, st[0]); if(ghIsDone(v)) return { c:'done', t:'✓ ' + (/^\d{4}-/.test(v) ? fmtDate(v) : 'Хийгдсэн') };
+  if(!g.start_on) return { c:'wait', t:'Хийгдээгүй' };
+  const due = addDays(g.start_on, st[2]), d = daysUntil(due);
+  return d < 0 ? { c:'late', t:`${-d} хоног хоцорсон`, due } : d <= 7 ? { c:'soon', t:d ? `${d} хоногийн дараа` : 'Өнөөдөр', due } : { c:'wait', t:fmtDate(due) + ' хүртэл', due }; };
+function demoGreen(){ return S.emps.slice(3, 9).map((e, i) => ({ id:i + 1, employee_id:e.id, sap:e.emp_code, full_name:e.full_name, position:e.position, dept_name:deptName(e.department_id),
+  start_on:addDays(todayStr(), -[95, 70, 45, 31, 12, 3][i]), steps:{ intro:'Completed', d30:i < 3 ? 'Completed' : 'no action', d60:i < 1 ? 'Completed' : 'no action', d90:'no action', test:'no action', conf:'no action' } })); }
+function viewGreen(){
+  const f = S.ghf ||= { q:'', dept:'', white:false };
+  if(!S.hasGh) return `<div class="page-head"><div><h1>Ногоон малгай</h1></div></div><div class="panel panel-body"><p class="note">Энэ хэсгийг ашиглахын тулд Supabase SQL Editor дээр <b>setup.sql</b>-ийн "Ногоон малгай" хэсгийг ажиллуулна уу.</p></div>`;
+  const all = (S.gh || []).map(g => ({ g, e:g.employee_id ? IDX.emp.get(g.employee_id) : null })).filter(x => !S.myDept || x.e);
+  const act = all.filter(x => !ghDone(x.g)), white = all.length - act.length;
+  const states = act.map(x => GH_STEPS.map(st => ghState(x.g, st)));
+  const late = states.filter(r => r.some(s => s.c === 'late')).length, soon = states.filter(r => !r.some(s => s.c === 'late') && r.some(s => s.c === 'soon')).length;
+  const q = f.q.trim().toLowerCase(), depts = [...new Set(all.map(x => x.e ? deptName(x.e.department_id) : x.g.dept_name).filter(Boolean))].sort();
+  const list = (f.white ? all : act).filter(x => { const dn = x.e ? deptName(x.e.department_id) : x.g.dept_name;
+    return (!f.dept || dn === f.dept) && (!q || [x.g.full_name, x.g.sap, x.g.position, dn].join(' ').toLowerCase().includes(q)); })
+    .sort((a, b) => (a.g.start_on || '').localeCompare(b.g.start_on || ''));
+  const tile = (cls, lbl, val, sub) => `<div class="tile ${cls}" style="cursor:default"><span class="t-lbl">${lbl}</span><span class="t-num">${val}</span><span class="t-sub">${sub}</span></div>`;
+  const last = S.settings?.last_gh;
+  const rows = list.map(({ g, e }) => { const done = ghDone(g), days = g.start_on ? -daysUntil(g.start_on) : null;
+    return `<tr class="${done ? 'gh-white' : ''}"><td>${done ? '' : GH_ICON(22)}</td>
+      <td>${e ? `<button data-act="profile" data-id="${e.id}" style="text-align:left;background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font:inherit"><b>${esc(e.full_name)}</b></button>` : `<b>${esc(g.full_name)}</b>`}<br><span class="muted mono" style="font-size:12px">${esc(g.sap || '')}</span>${e ? '' : ' <span class="faint" style="font-size:11px" title="Ажилтны жагсаалтад SAP кодоор олдсонгүй">· системд олдоогүй</span>'}</td>
+      <td>${esc(g.position || e?.position || '—')}<br><span class="muted" style="font-size:12px">${esc(e ? deptName(e.department_id) : g.dept_name || '')}</span></td>
+      <td class="mono">${fmtDate(g.start_on)}<br><span class="muted" style="font-size:12px">${days != null ? `${days} дэх хоног` : ''}</span></td>
+      ${GH_STEPS.map(st => { const x = ghState(g, st); return `<td><span class="gh-st ${x.c}" ${x.due ? `title="Хийх хугацаа: ${fmtDate(x.due)}"` : ''}><b>${esc(x.t)}</b></span></td>`; }).join('')}</tr>`; }).join('');
+  return `<div class="page-head"><div><h1>${GH_ICON(26)} Ногоон малгайтай ажилчид</h1><p>Шинэ ажилтны ногоон малгай хөтөлбөр · 30, 60, 90 хоногийн үнэлгээ. "White hat confirmed" болсон ажилтан автоматаар цагаан малгайд шилжинэ.</p>
+      ${last ? `<p class="faint" style="font-size:12px;margin:4px 0 0">Сүүлд шинэчилсэн: ${fmtDate(String(last.at).slice(0, 10))} · ${esc(last.file || '')}</p>` : ''}</div>
+    <div class="actions">${S.admin ? `<label class="btn btn-primary" style="cursor:pointer">Ногоон малгайн Excel<input type="file" accept=".xlsx,.xls,.xlsm" data-ghimport hidden></label>` : ''}</div></div>
+  <div class="tiles">${tile('', 'Ногоон малгай', act.length, 'хөтөлбөрт байгаа')}${tile('t-bad', 'Хоцорсон үнэлгээ', late, 'ажилтан')}${tile('t-warn', '7 хоногт хийх', soon, 'ажилтан')}${tile('t-ok', 'Цагаан малгайд шилжсэн', white, 'Excel-д confirmed')}</div>
+  <div class="toolbar" style="margin-top:14px">
+    <input class="inp search" type="search" placeholder="Нэр, SAP, албан тушаал" value="${esc(f.q)}" data-ghf="q" aria-label="Хайх">
+    <select class="inp" data-ghf="dept" aria-label="Алба"><option value="">Бүх алба</option>${depts.map(d => `<option ${f.dept === d ? 'selected' : ''}>${esc(d)}</option>`).join('')}</select>
+    <button class="btn btn-sm ${f.white ? 'btn-primary' : ''}" data-act="gh-white">Цагаан малгайд шилжсэнийг харуулах</button>
+  </div>
+  ${all.length ? `<p class="count">${list.length} ажилтан</p><div class="panel tbl-wrap"><table class="tbl gh-tbl"><thead><tr><th></th><th>Ажилтан</th><th>Албан тушаал</th><th>Эхэлсэн</th>${GH_STEPS.map(s => `<th>${esc(s[1])}</th>`).join('')}</tr></thead><tbody>${rows || `<tr><td colspan="${4 + GH_STEPS.length}" class="empty">Тохирох ажилтан алга.</td></tr>`}</tbody></table></div>`
+    : `<div class="panel panel-body"><p class="note">Бүртгэл алга. <b>Ногоон малгайн Excel</b>-ээ оруулна уу.</p></div>`}`;
+}
+function parseGhSheets(sheets){
+  for(const sh of sheets){
+    for(let h = 0; h < Math.min(15, sh.rows.length); h++){
+      const k = sh.rows[h].map(normKey), find = re => k.findIndex(x => re.test(x));
+      const c = { sap:find(/^(sap|employeeid|код|id)$/), name:find(/^(fullname|name|овогнэр|нэр|worker)$/), start:find(/programstart|startdate|эхэлсэн/) };
+      if(c.name < 0 || c.start < 0) continue;
+      c.pos = find(/^(position|албантушаал)$/); c.dept = find(/^(department|алба)$/);
+      const sc = {}; for(const st of GH_STEPS){ const i = k.findIndex((x, j) => j !== c.start && st[3].test(x) && !Object.values(sc).includes(j)); if(i >= 0) sc[st[0]] = i; }
+      // "White hard hat test" нь "confirmed"-тэй андуурагдахгүй байхаар
+      const rows = sh.rows.slice(h + 1).map(r => { const name = cleanName(cellStr(r[c.name])); if(!name) return null;
+        const steps = {}; for(const [key, i] of Object.entries(sc)){ const v = r[i]; const d = typeof v === 'number' || v instanceof Date ? cellDate(v) : ''; steps[key] = d || cellStr(v); }
+        return { sap:c.sap >= 0 ? cellStr(r[c.sap]) : '', full_name:name, position:c.pos >= 0 ? cellStr(r[c.pos]) : '', dept_name:c.dept >= 0 ? cellStr(r[c.dept]) : '', start_on:cellDate(r[c.start]) || null, steps }; }).filter(Boolean);
+      return { sheet:sh.name, rows, cols:Object.keys(sc) };
+    }
+  }
+  return null;
+}
+async function startGhImport(file){
+  try{
+    const P = parseGhSheets(await readSheets(file));
+    if(!P || !P.rows.length) throw new Error('Ногоон малгайн хүснэгт олдсонгүй ("Full name", "Program start date" баганатай)');
+    const byCode = new Map(S.emps.filter(e => e.emp_code).map(e => [codeK(e.emp_code), e]));
+    const byName = new Map(); S.emps.forEach(e => nameKeys(e.full_name).forEach(k => { if(!byName.has(k)) byName.set(k, []); byName.get(k).push(e); }));
+    const ex = new Map((S.gh || []).map(g => [codeK(g.sap) || normKey(g.full_name), g]));
+    const pl = { ins:[], upd:[], del:[], unmatched:[], white:0 }, seen = new Set();
+    for(const r of P.rows){
+      let e = r.sap && byCode.get(codeK(r.sap)); if(!e){ for(const k of nameKeys(r.full_name)){ const c = byName.get(k) || []; if(c.length === 1){ e = c[0]; break; } } }
+      if(!e) pl.unmatched.push(r.full_name);
+      const row = { ...r, employee_id:e?.id || null }, key = codeK(r.sap) || normKey(r.full_name); if(seen.has(key)) continue; seen.add(key);
+      if(ghDone(row)) pl.white++;
+      const old = ex.get(key); if(old) pl.upd.push({ id:old.id, row }); else pl.ins.push(row);
+    }
+    pl.del = (S.gh || []).filter(g => !seen.has(codeK(g.sap) || normKey(g.full_name))).map(g => g.id);
+    S.gim = { file:file.name, P, pl };
+    openModal({ title:`Ногоон малгай импорт · ${file.name}`, body:`
+      <div class="imp-sum"><div><b>${P.rows.length}</b><span>Файлд</span></div><div><b>${pl.ins.length}</b><span>Шинэ</span></div><div><b>${pl.upd.length}</b><span>Шинэчлэгдэх</span></div><div><b>${pl.del.length}</b><span>Файлаас хасагдсан (устгана)</span></div></div>
+      <p class="note" style="margin:0">Sheet: <b>${esc(P.sheet)}</b> · Таньсан алхам: ${P.cols.map(k => esc(GH_STEPS.find(s => s[0] === k)[1])).join(', ')}</p>
+      ${P.cols.length < GH_STEPS.length ? `<p class="note" style="margin:0;color:var(--warn)">Олдоогүй багана: ${GH_STEPS.filter(s => !P.cols.includes(s[0])).map(s => esc(s[1])).join(', ')}</p>` : ''}
+      ${pl.white ? `<p class="note" style="margin:0">${pl.white} ажилтан "White hat confirmed" болсон тул цагаан малгайд шилжинэ.</p>` : ''}
+      ${pl.unmatched.length ? `<details class="hist"><summary style="color:var(--warn)">Системд олдоогүй ${pl.unmatched.length} ажилтан (нэрээр нь хадгална)</summary><pre class="code" style="margin-top:6px;white-space:pre-wrap">${esc(pl.unmatched.join('\n'))}</pre></details>` : ''}
+      <div class="m-foot"><button class="btn" data-act="close">Болих</button><button class="btn btn-primary" data-act="gh-apply">Оруулах</button></div>` });
+  } catch(e){ console.error(e); toast(e.message || String(e), 'bad'); }
+}
+async function applyGhImport(){
+  const { pl, file } = S.gim, at = new Date().toISOString();
+  if(pl.ins.length) await dbInsert('green_hats', pl.ins.map(r => ({ ...r, updated_at:at })));
+  for(const u of pl.upd) await dbUpdate('green_hats', u.id, { ...u.row, updated_at:at });
+  if(pl.del.length) await dbDeleteMany('green_hats', pl.del);
+  try{ await saveSettings({ last_gh:{ at, file } }); } catch{ S.settings.last_gh = { at, file }; }
+  return true;
+}
 function viewLogin(){
   return `<div class="login"><div class="panel"><div class="panel-body" style="display:flex;flex-direction:column;gap:16px">
     <div style="display:flex;flex-direction:column;gap:14px;padding-bottom:4px"><img class="login-logo logo-l" src="logo-light.png" alt="Premium"><img class="login-logo logo-d" src="logo-dark.png" alt="Premium"><div><b style="display:block;font-size:16px">Сургалтын бүртгэл</b><small class="muted">Нэвтрэх хэсэг</small></div></div>
@@ -1080,10 +1201,10 @@ const tplFor = d => ORG_TPL[normKey(d.name)] || null;
 function obox(n, edit, root){
   const e = n.employee_id && IDX.emp.get(n.employee_id), st = e ? empStatus(e.id) : '';
   const title = n.title?.trim();
-  return `<div class="obox ${root ? 'root' : ''}" data-drop-node="${n.id}" ${edit ? `draggable="true" data-drag-node="${n.id}"` : ''}>
+  return `<div class="obox ${root ? 'root' : ''} ${e && isGH(e.id) ? 'gh' : ''}" data-drop-node="${n.id}" ${edit ? `draggable="true" data-drag-node="${n.id}"` : ''}>
     <div class="ob-title ${title ? '' : 'blank'}" title="${esc(title || 'Ажилтан')}">${title ? esc(title) : 'Ажилтан'}</div>
     ${edit ? `<button class="ob-menu" data-act="org-edit" data-id="${n.id}" title="Засах" aria-label="Хайрцаг засах">•••</button>` : ''}
-    ${e ? `<div class="ob-person" data-act="profile" data-id="${e.id}" ${edit ? `draggable="true" data-drag-emp="${e.id}" data-from="${n.id}"` : ''} title="${esc(e.full_name)} · ${esc(e.position||'')} · ${ST[st]}"><span class="ob-av">${avatar(e,'sm')}<i class="ob-dot st-${st}"></i></span><span class="on-txt"><span class="on-name">${esc(e.full_name)}</span><span class="on-pos">${esc(e.position||'—')}</span></span></div>`
+    ${e ? `<div class="ob-person" data-act="profile" data-id="${e.id}" ${edit ? `draggable="true" data-drag-emp="${e.id}" data-from="${n.id}"` : ''} title="${esc(e.full_name)} · ${esc(e.position||'')} · ${ST[st]}"><span class="ob-av">${avatar(e,'sm')}<i class="ob-dot st-${st}"></i></span><span class="on-txt"><span class="on-name">${ghName(e)}</span><span class="on-pos">${esc(e.position||'—')}</span></span></div>`
        : edit ? `<button class="ob-empty" data-act="org-edit" data-id="${n.id}"><i>+</i>Хүн сонгох</button>` : `<span class="ob-empty"><i></i>Сул орон тоо</span>`}
   </div>`;
 }
@@ -1166,7 +1287,7 @@ function viewTeam(deptId){
   </section>
   <section class="panel" ${edit ? 'data-drop-pool="1"' : ''}><div class="panel-head"><h2>Бүтцэд байрлаагүй ажилтнууд</h2><span class="chip chip-plain">${pool.length}</span></div>
     <div class="panel-body">${edit && pool.length ? '<p class="org-hint" style="margin-bottom:8px">Хүнийг бүтэц дээрх хайрцаг эсвэл <b>+</b> руу чирнэ. Бүтцээс хасах бол хүнийг энд буцааж чирнэ.</p>' : ''}
-      <div class="pool">${pool.length ? pool.map(e => `<span class="pchip" ${edit ? `draggable="true" data-drag-emp="${e.id}"` : ''} data-act="profile" data-id="${e.id}" title="${esc(e.position||'')}">${avatar(e,'sm')}${esc(e.full_name)} <span class="muted" style="font-size:11px">${esc(e.position||'')}</span></span>`).join('') : '<span class="note">Бүх ажилтан бүтцэд байрласан.</span>'}</div></div></section>`;
+      <div class="pool">${pool.length ? pool.map(e => `<span class="pchip" ${edit ? `draggable="true" data-drag-emp="${e.id}"` : ''} data-act="profile" data-id="${e.id}" title="${esc(e.position||'')}" ${isGH(e.id) ? 'style="background:rgba(47,158,91,.13);border-color:#2f9e5b"' : ''}>${avatar(e,'sm')}${ghName(e)} <span class="muted" style="font-size:11px">${esc(e.position||'')}</span></span>`).join('') : '<span class="note">Бүх ажилтан бүтцэд байрласан.</span>'}</div></div></section>`;
 }
 
 /* --- org: үйлдлүүд --- */
@@ -1271,7 +1392,7 @@ function listEmps(){
   return `<p class="count">${l.length} ажилтан</p><div class="cards">${l.map(e => {
     const tl = (IDX.byEmp.get(e.id)||[]).sort((a,b) => a.days - b.days), st = empStatus(e.id);
     return `<button class="ecard ${e.active?'':'inactive'}" data-act="profile" data-id="${e.id}" data-photo-drop="${e.id}">${avatarPick(e,'lg')}
-      <span style="min-width:0"><span class="e-name">${esc(e.full_name)}</span><br><span class="e-pos">${esc(e.position||'—')}</span><br><span class="e-pos">${esc(deptName(e.department_id))}</span>
+      <span style="min-width:0"><span class="e-name">${ghName(e)}</span><br><span class="e-pos">${esc(e.position||'—')}</span><br><span class="e-pos">${esc(deptName(e.department_id))}</span>
       <span class="e-meta">${e.active ? chip(st) : chip('none','Гарсан')}<span class="dots" title="${tl.length} сургалт">${tl.map(c => `<i class="d-${c.status}"></i>`).join('')}</span></span></span></button>`;
   }).join('')}</div>`;
 }
@@ -1781,7 +1902,7 @@ E001 | Б.Батбаяр | Галын аюулгүй байдал | 2026-03-15  
     ${importsPanel()}
   </div></section>`;
 }
-const VIEWS = { news:viewNews, dash:viewDash, org:viewOrg, emps:viewEmps, trs:viewTrs, book:viewBook, lic:viewLic, settings:viewSettings };
+const VIEWS = { green:viewGreen, news:viewNews, dash:viewDash, org:viewOrg, emps:viewEmps, trs:viewTrs, book:viewBook, lic:viewLic, settings:viewSettings };
 
 /* ---------- modals ---------- */
 function openModal({ title, body, wide=false, drawer=false }){
@@ -1812,7 +1933,7 @@ function profileBody(id){
   const mgr = e.manager_id ? IDX.emp.get(e.manager_id) : null;
   const reps = S.emps.filter(x => x.manager_id === id && x.active).sort((a,b) => a.full_name.localeCompare(b.full_name,'mn'));
   return `<div class="prof-top"><div class="prof-photo" data-photo-drop="${id}">${avatarPick(e,'xl')}<label class="btn btn-sm">Зураг ${e.photo_url?'солих':'оруулах'}<input type="file" accept="image/*" data-photo="${id}" hidden></label></div>
-    <div style="min-width:0"><h3>${esc(e.full_name)}</h3><p class="muted" style="margin:2px 0 0">${esc(e.position||'—')} · ${esc(deptName(e.department_id))}</p>
+    <div style="min-width:0"><h3>${ghName(e)}</h3><p class="muted" style="margin:2px 0 0">${esc(e.position||'—')} · ${esc(deptName(e.department_id))}</p>
       <div style="margin-top:8px">${e.active ? chip(empStatus(id)) : chip('none','Ажлаас гарсан')}</div>
       <dl class="kv"><dt>Код</dt><dd class="mono">${esc(e.emp_code||'—')}</dd><dt>Имэйл</dt><dd>${e.email?`<a href="mailto:${esc(e.email)}">${esc(e.email)}</a>`:'—'}</dd><dt>Утас</dt><dd class="mono">${e.phone?`<a href="tel:${esc(e.phone)}">${esc(e.phone)}</a>`:'—'}</dd>
         ${e.roster ? `<dt>Ээлж</dt><dd>${esc(e.roster)}</dd>` : ''}${e.poi ? `<dt>Ажилд авсан газар (POI)</dt><dd>${esc(e.poi)}</dd>` : ''}
@@ -2457,6 +2578,8 @@ const ACT = {
       <div class="field"><label for="bd-d">Хамрагдсан огноо</label><input class="inp mono" id="bd-d" type="date" name="completed_on" required value="${b.end_on || b.start_on || todayStr()}"></div>
       <div class="pick-list">${items.map(x => { const e = x.employee_id && IDX.emp.get(x.employee_id); return `<label><input type="checkbox" name="bi" value="${x.id}" checked>${e ? avatar(e,'sm') : '<span></span>'}<span>${esc(biName(x))} <span class="p-sub">· ${esc(biDept(x))}</span></span></label>`; }).join('')}</div>
       <div class="m-foot"><button class="btn" type="button" data-act="close">Болих</button><button class="btn btn-primary" type="submit">Бүртгэх</button></div></form>` }); },
+  'gh-apply': async a => { a.disabled = true; const r = await run(applyGhImport, 'Ногоон малгайн бүртгэл шинэчлэгдлээ'); if(!r){ a.disabled = false; return; } S.gim = null; closeModal(); S.view = 'green'; render(); },
+  'gh-white': () => { S.ghf.white = !S.ghf.white; render(); },
   'bim-apply': async a => { a.disabled = true; const r = await run(applyBookImport); if(!r){ a.disabled = false; return; } S.bim = null; closeModal(); S.view = 'book'; render();
     toast(`Захиалга: +${r.ins} шинэ, ${r.upd} шинэчилсэн${r.del ? `, ${r.del} хассан` : ''}`); },
   'org-edit': a => { const n = S.nodes.find(x => x.id === Number(a.dataset.id)); if(n) openModal({ title:'Хайрцаг засах', body:orgEditForm(n) }); },
@@ -2505,6 +2628,7 @@ document.addEventListener('drop', ev => { const z = ev.target.closest?.('[data-d
 function updBulkCount(){ const n = $$('.pick-list input:checked').length; const c = $('#b-count'); if(c) c.textContent = `${n} сонгосон`; }
 document.addEventListener('focusin', ev => { if(ev.target.id === 'tp-subj') S.tplFocus = 'subj'; else if(ev.target.id === 'tp-body') S.tplFocus = 'body'; });
 document.addEventListener('input', ev => {
+  if(ev.target.dataset.ghf && S.ghf){ S.ghf[ev.target.dataset.ghf] = ev.target.value; const pos = ev.target.selectionStart, k = ev.target.dataset.ghf; render(); const n = document.querySelector(`[data-ghf="${k}"]`); if(n){ n.focus(); try{ n.setSelectionRange(pos, pos); } catch{} } return; }
   if('delq' in ev.target.dataset){ S.delQ = ev.target.value; const q = S.delQ.trim().toLowerCase(); const l = $('#del-list');
     if(l) l.innerHTML = delList((S.dels || []).filter(d => { const e = IDX.emp.get(d.employee_id); return e && (!q || [e.full_name, e.emp_code, typeName(d.training_type_id), deptName(e.department_id)].some(v => String(v || '').toLowerCase().includes(q))); }), true); return; }
   const t = ev.target;
@@ -2527,9 +2651,10 @@ document.addEventListener('input', ev => {
 });
 document.addEventListener('change', async ev => {
   const t = ev.target;
-  if(!S.admin && (t.dataset.photo || t.dataset.import || t.dataset.edit || 'bulkphoto' in t.dataset || 'bookimport' in t.dataset)){ t.value = ''; return denied(); }
+  if(!S.admin && (t.dataset.photo || t.dataset.import || t.dataset.edit || 'bulkphoto' in t.dataset || 'bookimport' in t.dataset || 'ghimport' in t.dataset)){ t.value = ''; return denied(); }
   if(t.dataset.photo && t.files[0]){ const id = Number(t.dataset.photo); await run(async () => { await uploadPhoto(id, t.files[0]); refresh(); }, 'Зураг хадгалагдлаа'); }
   if(t.dataset.import && t.files[0]){ const f = t.files[0]; t.value = ''; startImport(f); }
+  if('ghimport' in t.dataset && t.files[0]){ const f = t.files[0]; t.value = ''; startGhImport(f); return; }
   if('bookimport' in t.dataset && t.files[0]){ const f = t.files[0]; t.value = ''; openModal({ title:'Файл уншиж байна', body:'<div style="display:grid;place-items:center;padding:24px"><div class="spinner"></div></div>' }); startBookImport(f); }
   if(t.dataset.bim !== undefined && S.bim){ t.checked ? S.bim.pick.add(t.dataset.bim) : S.bim.pick.delete(t.dataset.bim); renderBookImport(); }
   if('bimDel' in t.dataset && S.bim){ S.bim.delMissing = t.checked; renderBookImport(); }
