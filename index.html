@@ -2374,9 +2374,8 @@ const ACT = {
   'edit-tr': a => { const t = S.trs.find(x => x.id === Number(a.dataset.id)); S.openEmp = null; openModal({ title:'Сургалт засах', body:trForm(t) }); },
   renew: a => { const t = S.trs.find(x => x.id === Number(a.dataset.id)); const tt = IDX.type.get(t.training_type_id); const d = todayStr(); S.openEmp = null;
     openModal({ title:'Сургалт сунгах', body:`<p class="note" style="margin:0">Шинэ бичлэг үүснэ. Өмнөх нь түүхэнд хадгалагдана.</p>`+trForm({ employee_id:t.employee_id, training_type_id:t.training_type_id, completed_on:d, expires_on:addMonths(d, tt.validity_months), provider:t.provider }) }); },
-  'del-tr': async a => { const t = S.trs.find(x => x.id === Number(a.dataset.id)); const all = S.trs.filter(x => x.employee_id === t.employee_id && x.training_type_id === t.training_type_id);
-    const latest = all.reduce((m, x) => !m || x.expires_on > m.expires_on ? x : m, null), rows = latest.id === t.id ? all : [t];
-    if(!await askConfirm(`"${typeName(t.training_type_id)}" сургалтыг ${IDX.emp.get(t.employee_id)?.full_name || ''}-аас устгах уу?${rows.length > 1 ? ` (${rows.length} бичлэг)` : ''} Энэ нь "Устгасан сургалт" хэсэгт хадгалагдаж, Excel импортоор дахин орж ирэхгүй.`)) return;
+  'del-tr': async a => { const t = S.trs.find(x => x.id === Number(a.dataset.id)), rows = [t]; // зөвхөн дарсан бичлэг; өмнөх бичлэгүүд хэвээр үлдэнэ
+    if(!await askConfirm(`"${typeName(t.training_type_id)}" (${fmtDate(t.completed_on)} – ${fmtDate(t.expires_on)}) бичлэгийг ${IDX.emp.get(t.employee_id)?.full_name || ''}-аас устгах уу? Энэ нь "Устгасан сургалт" хэсэгт хадгалагдаж, Excel импортоор дахин орж ирэхгүй.`)) return;
     await run(async () => { await archiveTrainings(rows, 'Гараар устгасан'); refresh(); }, 'Устгасан сургалт хэсэгт шилжлээ'); },
   'del-list': () => { S.delQ = ''; S.openEmp = null; delModal(); },
   'restore-tr': async a => { const ids = new Set(a.dataset.ids.split(',').map(Number)), g = S.dels.filter(d => ids.has(d.id)); if(!g.length) return;
