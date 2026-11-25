@@ -1486,12 +1486,16 @@ function sessionCard(g){
     ${S.admin && open ? `<span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm btn-primary" data-act="bk-done" data-ids="${g.map(x => x.id).join(',')}">Явагдсан</button><button class="btn btn-sm btn-danger" data-act="bk-cancel" data-ids="${g.map(x => x.id).join(',')}">Цуцлах</button></span>` : ''}</div>
     <div class="bk-ppl">${g.map(personChip).join('')}</div></div>`;
 }
+// Өдрөөр харагдацыг нээхэд өнөөдрийн (эсвэл дараагийн) өдрийг дэлгэцийн дээд хэсэгт гаргана. Дээш гүйлгэвэл өмнөх, доош бол дараах өдрүүд.
+function bkScrollToday(){ requestAnimationFrame(() => { const el = document.getElementById('bk-anchor'); if(!el || S.view !== 'book' || S.bv?.view !== 'day') return;
+  const y = el.getBoundingClientRect().top + window.scrollY - 16; window.scrollTo({ top:Math.max(0, y), behavior:'auto' }); }); }
 function bkDayView(all){
   const byDay = new Map(); all.forEach(b => { const k = b.start_on || ''; if(!byDay.has(k)) byDay.set(k, []); byDay.get(k).push(b); });
   const today = todayStr(), keys = [...byDay.keys()].sort((a, b) => (a || '9999').localeCompare(b || '9999'));
   if(!keys.length) return '<div class="panel empty">Тохирох захиалга алга.</div>';
+  const anchor = keys.find(k => k && k >= today); // өнөөдөр, эсвэл өнөөдрөөс хойших хамгийн ойрын өдөр
   return `<div class="bk-days">${keys.map(k => { const l = byDay.get(k), d = k ? parseYmd(k) : null, past = k && k < today;
-    return `<section class="panel bk-day ${k === today ? 'today' : ''} ${past ? 'past' : ''}"><div class="panel-head"><div class="bk-dh">${d ? `<span class="bk-date"><b>${d.getDate()}</b><span>${MON[d.getMonth()]}</span></span><span><b>${WD[d.getDay()]}</b>${k === today ? ' · <span style="color:var(--accent)">Өнөөдөр</span>' : ''}<br><span class="p-sub">${fmtDate(k)}</span></span>` : '<b>Огноо тодорхойгүй</b>'}</div>
+    return `<section class="panel bk-day ${k === today ? 'today' : ''} ${past ? 'past' : ''}" ${k && k === anchor ? 'id="bk-anchor"' : ''}><div class="panel-head"><div class="bk-dh">${d ? `<span class="bk-date"><b>${d.getDate()}</b><span>${MON[d.getMonth()]}</span></span><span><b>${WD[d.getDay()]}</b>${k === today ? ' · <span style="color:var(--accent)">Өнөөдөр</span>' : ''}<br><span class="p-sub">${fmtDate(k)}</span></span>` : '<b>Огноо тодорхойгүй</b>'}</div>
       <div class="chips-row" style="align-items:center">${l.filter(biIsNew).length ? `<span class="mk mk-new">+${l.filter(biIsNew).length} шинэ</span>` : ''}${l.filter(biIsChg).length ? `<span class="mk mk-chg">${l.filter(biIsChg).length} өөрчлөгдсөн</span>` : ''}<span class="chip chip-acc">${l.length} хүн</span>${deptChips(l)}</div></div>
       <div class="panel-body bk-sess">${bkGroups(l).map(sessionCard).join('')}</div></section>`; }).join('')}</div>`;
 }
@@ -2357,7 +2361,7 @@ function exportCSV(){
 
 /* ---------- events ---------- */
 const ACT = {
-  nav: a => { S.view = a.dataset.v; if(S.view === 'news') newsSeen(); if(S.view === 'org') S.org = null; render(); window.scrollTo(0,0); },
+  nav: a => { S.view = a.dataset.v; if(S.view === 'news') newsSeen(); if(S.view === 'org') S.org = null; render(); window.scrollTo(0,0); if(S.view === 'book') bkScrollToday(); },
   'goto-trs': a => { const st = a.dataset.st||'', dept = a.dataset.dept||''; if(!st || st === 'none'){ S.view = 'emps'; S.ef = { q:'', dept, status:'none', inactive:false }; } else { S.view = 'trs'; S.tf = { q:'', dept, type:'', status:st }; } render(); window.scrollTo(0,0); },
   'goto-org': a => { S.view = 'org'; S.org = a.dataset.dept ? Number(a.dataset.dept) : null; render(); window.scrollTo(0,0); },
   'org-back': () => { S.org = null; render(); window.scrollTo(0,0); },
@@ -2431,7 +2435,7 @@ const ACT = {
     openModal({ title:'Үнэмлэх CSV', wide:true, body:`<textarea class="inp mono" id="exp-csv" style="min-height:260px;font-size:12px" readonly>${esc(csv)}</textarea><div class="m-foot"><button class="btn" data-act="copy-csv">Хуулах</button><button class="btn btn-primary" data-act="dl-csv">Татах (.csv)</button></div>` }); },
   'bk-new': (a, ev) => { ev?.preventDefault(); S.openEmp = null; const tid = a.dataset.type ? Number(a.dataset.type) : undefined; const due = a.dataset.ids ? a.dataset.ids.split(',').map(Number) : tid ? (dueList().find(g => g.tid === tid)?.ids || []) : [];
     openModal({ title:'Сургалт захиалах', wide:true, body:bkForm(tid, due) }); },
-  'bk-view': a => { S.bv.view = a.dataset.v; render(); },
+  'bk-view': a => { S.bv.view = a.dataset.v; render(); bkScrollToday(); },
   'bk-only': a => { S.bv.only = a.dataset.o; if(S.bv.view === 'due') S.bv.view = 'day'; render(); },
   'bk-dept': a => { S.bv.dept = a.dataset.d; render(); },
   'bk-item': (a, ev) => { ev.stopPropagation(); const b = S.bitems.find(x => x.id === Number(a.dataset.id)); if(!b) return;
@@ -2503,7 +2507,7 @@ document.addEventListener('input', ev => {
   const t = ev.target;
   if(t.form?.dataset.form === 'mail-tpl') updTplPreview();
   if(t.dataset.filter){ const o = S[t.dataset.filter]; o[t.dataset.key] = t.type === 'checkbox' ? t.checked : t.value; $('#list').innerHTML = t.dataset.filter === 'ef' ? listEmps() : t.dataset.filter === 'lf' ? listLic() : listTrs(); }
-  if(t.dataset.bv !== undefined && S.bv){ S.bv[t.dataset.bv] = t.value; if(t.dataset.bv === 'q'){ $('#bk-body').innerHTML = S.bv.view === 'due' ? bkDueView(dueList()) : S.bv.view === 'dept' ? bkDeptView(bkFiltered()) : S.bv.view === 'type' ? bkTypeView(bkFiltered()) : bkDayView(bkFiltered()); } else render(); }
+  if(t.dataset.bv !== undefined && S.bv){ S.bv[t.dataset.bv] = t.value; if(t.dataset.bv === 'q'){ $('#bk-body').innerHTML = S.bv.view === 'due' ? bkDueView(dueList()) : S.bv.view === 'dept' ? bkDeptView(bkFiltered()) : S.bv.view === 'type' ? bkTypeView(bkFiltered()) : bkDayView(bkFiltered()); } else { render(); if(t.dataset.bv === 'month') bkScrollToday(); } }
   if('empq' in t.dataset){ const q = t.value.trim().toLowerCase(), sel = $('#t-emp'); let first = null; [...sel.options].forEach(o => { o.hidden = !!q && !o.dataset.s.includes(q); if(!o.hidden && !first) first = o; }); if(first && (!sel.value || sel.selectedOptions[0]?.hidden)) sel.value = first.value; }
   if('nf' in t.dataset && S.nf){ S.nf.q = t.value; const f = S.nf, q = f.q.trim().toLowerCase(); $('#news-list').innerHTML = [...S.news].filter(n => (!f.cat || n.category === f.cat) && (!q || (n.title + ' ' + (n.body||'')).toLowerCase().includes(q))).sort((a, b) => (b.pinned - a.pinned) || b.created_at.localeCompare(a.created_at)).map(newsCard).join('') || '<div class="panel empty">Тохирох мэдээ алга.</div>'; }
   if('bkt' in t.dataset){ const ch = new Set($$('#bk-pick input:checked').map(i => Number(i.value))); $('#bk-pick').innerHTML = bkPick(Number(t.value), ch); const q = $('#b-q'); if(q) q.dispatchEvent(new Event('input', { bubbles:true })); }
