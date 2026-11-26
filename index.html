@@ -992,6 +992,9 @@ function render(){
   document.body.classList.toggle('ro', !S.admin);
   if(!S.admin && S.view === 'settings') S.view = 'dash';
   const nav = [['dash','Хянах самбар'],['org','Алба'],['emps','Ажилтнууд'],['green','Ногоон малгай'],['trs','Сургалтын бүртгэл'],['book','Сургалт захиалга'],['lic','Эрхийн үнэмлэх'],['news','Мэдээ мэдээлэл'], ...(S.admin ? [['settings','Тохиргоо']] : [])];
+  // Дахин зурахад (хүн нэмэх, зөөх гэх мэт) хуудас болон бүтцийн гүйлгэсэн байрлалыг хадгална
+  const cv0 = $('.org-canvas'), keep = S._rv && S._rv.view === S.view && S._rv.org === S.org ? { y:window.scrollY, l:cv0?.scrollLeft, t:cv0?.scrollTop } : null;
+  S._rv = { view:S.view, org:S.org };
   app.innerHTML = `<div class="shell">
     <aside class="side">
       <div class="brand"><img class="brand-logo" src="logo-dark.png" alt="Premium"><img class="brand-mark-img" src="logo-mark.png" alt="Premium"><span class="brand-app">Сургалтын бүртгэл</span></div>
@@ -1002,6 +1005,10 @@ function render(){
   </div>`;
   // org chart: дээд удирдлагыг дэлгэцийн голд гаргана
   applyOrgZoom();
+  if(keep){ const cv = $('.org-canvas'); if(cv && keep.l != null){ cv.scrollLeft = keep.l; cv.scrollTop = keep.t; } window.scrollTo(0, keep.y);
+    const f = S.orgFocus && document.querySelector(`[data-drop-node="${S.orgFocus}"]`); S.orgFocus = null;
+    if(f){ const r = f.getBoundingClientRect(); if(r.top < 0 || r.bottom > innerHeight || r.left < 0 || r.right > innerWidth) f.scrollIntoView({ block:'center', inline:'center' }); }
+    return; }
   $$('.org-scroll,.org-canvas').forEach(el => { const h = el.querySelector('.onode.head,.obox.root'); if(!h) return; const a = el.getBoundingClientRect(), b = h.getBoundingClientRect(); el.scrollLeft += (b.left + b.width/2) - (a.left + a.width/2); });
 }
 const demoBar = () => `<div class="demo-bar"><b>Демо горим.</b><span>Жишээ 150 ажилтантай. Өөрчлөлт хадгалагдахгүй, имэйл илгээгдэхгүй. Жинхэнээр ажиллуулах заавар: GitHub дээрх README файл.</span></div>`;
@@ -1299,7 +1306,7 @@ function viewTeam(deptId){
 /* --- org: үйлдлүүд --- */
 async function orgCreate(deptId, spec, parentId, sort){
   const [title, kids] = spec;
-  const n = await dbInsert('org_nodes', { department_id:deptId, parent_id:parentId ?? null, title:title || null, sort:sort ?? 0 });
+  const n = await dbInsert('org_nodes', { department_id:deptId, parent_id:parentId ?? null, title:title || null, sort:sort ?? 0 }); if(n?.id) S.orgFocus = n.id;
   for(const [i, k] of (kids || []).entries()) await orgCreate(deptId, k, n.id, i);
   return n;
 }
@@ -1309,7 +1316,7 @@ async function orgAssign(nodeId, empId, swap){
   const from = empId ? S.nodes.find(n => n.employee_id === empId) : null, prev = target.employee_id;
   if(from) await dbUpdate('org_nodes', from.id, { employee_id:null });
   if(prev && empId) await dbUpdate('org_nodes', nodeId, { employee_id:null });
-  await dbUpdate('org_nodes', nodeId, { employee_id:empId || null });
+  await dbUpdate('org_nodes', nodeId, { employee_id:empId || null }); S.orgFocus = nodeId;
   if(swap && from && prev) await dbUpdate('org_nodes', from.id, { employee_id:prev });
 }
 const isInside = (id, root) => { let n = S.nodes.find(x => x.id === id); const seen = new Set(); while(n && !seen.has(n.id)){ if(n.id === root) return true; seen.add(n.id); n = S.nodes.find(x => x.id === n.parent_id); } return false; };
@@ -2602,9 +2609,9 @@ const ACT = {
     toast(`Захиалга: +${r.ins} шинэ, ${r.upd} шинэчилсэн${r.del ? `, ${r.del} хассан` : ''}`); },
   'org-edit': a => { const n = S.nodes.find(x => x.id === Number(a.dataset.id)); if(n) openModal({ title:'Хайрцаг засах', body:orgEditForm(n) }); },
   'org-add': async a => { const pid = Number(a.dataset.parent), p = S.nodes.find(n => n.id === pid); if(!p) return;
-    const n = await run(() => dbInsert('org_nodes', { department_id:p.department_id, parent_id:pid, title:null, sort:nextSort(p.department_id, pid) })); if(n){ closeModal(); render(); openModal({ title:'Шинэ хайрцаг', body:orgEditForm(n) }); } },
+    const n = await run(() => dbInsert('org_nodes', { department_id:p.department_id, parent_id:pid, title:null, sort:nextSort(p.department_id, pid) })); if(n){ S.orgFocus = n.id; closeModal(); render(); openModal({ title:'Шинэ хайрцаг', body:orgEditForm(n) }); } },
   'org-add-root': async a => { const did = Number(a.dataset.dept);
-    const n = await run(() => dbInsert('org_nodes', { department_id:did, parent_id:null, title:deptNodes(did).length ? null : 'Manager', sort:nextSort(did, null) })); if(n){ render(); openModal({ title:'Шинэ хайрцаг', body:orgEditForm(n) }); } },
+    const n = await run(() => dbInsert('org_nodes', { department_id:did, parent_id:null, title:deptNodes(did).length ? null : 'Manager', sort:nextSort(did, null) })); if(n){ S.orgFocus = n.id; render(); openModal({ title:'Шинэ хайрцаг', body:orgEditForm(n) }); } },
   'org-del': async a => { const id = Number(a.dataset.id), k = S.nodes.filter(n => n.parent_id === id).length;
     if(!await askConfirm(`Энэ хайрцгийг устгах уу?${k ? ` Доорх ${k} хайрцаг нэг шат дээш шилжинэ.` : ''} Ажилтан өөрөө устахгүй.`)) return;
     if(await run(async () => { await orgDelete(id); return true; }, 'Хайрцаг устгагдлаа')){ closeModal(); render(); } },
