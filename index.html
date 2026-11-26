@@ -1023,7 +1023,7 @@ function demoGreen(){ return S.emps.slice(3, 9).map((e, i) => ({ id:i + 1, emplo
 function viewGreen(){
   const f = S.ghf ||= { q:'', dept:'', white:false };
   if(!S.hasGh) return `<div class="page-head"><div><h1>Ногоон малгай</h1></div></div><div class="panel panel-body"><p class="note">Энэ хэсгийг ашиглахын тулд Supabase SQL Editor дээр <b>setup.sql</b>-ийн "Ногоон малгай" хэсгийг ажиллуулна уу.</p></div>`;
-  const all = (S.gh || []).map(g => ({ g, e:g.employee_id ? IDX.emp.get(g.employee_id) : null })).filter(x => !S.myDept || x.e);
+  const all = (S.gh || []).map(g => ({ g, e:g.employee_id ? IDX.emp.get(g.employee_id) : null }));  // бүх хэрэглэгчид (албаны данс ч) бүх ногоон малгайтай ажилчдыг харна
   const act = all.filter(x => !ghDone(x.g)), white = all.length - act.length;
   const states = act.map(x => GH_STEPS.map(st => ghState(x.g, st)));
   const late = states.filter(r => r.some(s => s.c === 'late')).length, soon = states.filter(r => !r.some(s => s.c === 'late') && r.some(s => s.c === 'soon')).length;

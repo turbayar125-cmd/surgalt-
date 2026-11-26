@@ -563,8 +563,8 @@ drop policy if exists "read_scoped"  on public.green_hats;
 drop policy if exists "admin_insert" on public.green_hats;
 drop policy if exists "admin_update" on public.green_hats;
 drop policy if exists "admin_delete" on public.green_hats;
-create policy "read_scoped"  on public.green_hats for select to authenticated
-  using (public.my_dept() is null or (employee_id is not null and public.can_see_emp(employee_id)));
+drop policy if exists "read_all" on public.green_hats;
+create policy "read_all"     on public.green_hats for select to authenticated using (true);  -- бүх нэвтэрсэн хэрэглэгч харна
 create policy "admin_insert" on public.green_hats for insert to authenticated with check (public.is_admin());
 create policy "admin_update" on public.green_hats for update to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy "admin_delete" on public.green_hats for delete to authenticated using (public.is_admin());
