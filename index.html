@@ -98,6 +98,10 @@ button,input,select,textarea{font:inherit;color:inherit}
 .danger-zone{border:1px solid var(--bad-soft);border-radius:9px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .main{min-width:0;padding-block:24px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+.wrap:has(.org-canvas){max-width:none} /* албаны бүтэц: дэлгэцийн бүх өргөнийг ашиглана */
+.org-zoom{display:inline-flex;align-items:center;gap:4px;margin-left:auto}
+.org-zoom .btn{min-width:32px;justify-content:center}
+.org-zoom .zv{min-width:48px;text-align:center;font-size:12px;font-variant-numeric:tabular-nums;color:var(--muted)}
 @media (min-width:861px){.main{padding-left:32px;padding-right:32px}}
 @media (max-width:860px){
   .shell{grid-template-columns:1fr}
@@ -997,6 +1001,7 @@ function render(){
     <main class="main"><div class="wrap">${DEMO ? demoBar() : ''}${S.myDept ? `<div class="ro-note" style="background:var(--accent-soft);color:var(--accent)">Та зөвхөн <b>${esc(deptName(S.myDept))}</b> албаны мэдээллийг харж байна.</div>` : ''}${!DEMO && !S.admin ? '<div class="ro-note">Танд <b>зөвхөн харах</b> эрх байна (Алба цэсний бүтцийг засах боломжтой). Бусад мэдээлэл засах бол админтай холбогдоно уу: <a href="mailto:Turbayar.O@premiumconcrete.mn?subject=%D0%A1%D1%83%D1%80%D0%B3%D0%B0%D0%BB%D1%82%D1%82%D0%B0%D0%B9%20%D1%85%D0%BE%D0%BB%D0%B1%D0%BE%D0%BE%D1%82%D0%BE%D0%B9%20%D1%85%D2%AF%D1%81%D1%8D%D0%BB%D1%82"><b>Turbayar.O@premiumconcrete.mn</b></a></div>' : ''}${VIEWS[S.view]()}</div></main>
   </div>`;
   // org chart: дээд удирдлагыг дэлгэцийн голд гаргана
+  applyOrgZoom();
   $$('.org-scroll,.org-canvas').forEach(el => { const h = el.querySelector('.onode.head,.obox.root'); if(!h) return; const a = el.getBoundingClientRect(), b = h.getBoundingClientRect(); el.scrollLeft += (b.left + b.width/2) - (a.left + a.width/2); });
 }
 const demoBar = () => `<div class="demo-bar"><b>Демо горим.</b><span>Жишээ 150 ажилтантай. Өөрчлөлт хадгалагдахгүй, имэйл илгээгдэхгүй. Жинхэнээр ажиллуулах заавар: GitHub дээрх README файл.</span></div>`;
@@ -1277,8 +1282,9 @@ function viewTeam(deptId){
     ${tile('','Сургалтгүй ажилтан', members.filter(e => !(IDX.byEmp.get(e.id)||[]).length).length, 'Нэг ч бүртгэлгүй', 'none')}
   </div>
   <section class="panel"><div class="panel-head"><div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><h2>Бүтэц</h2><div class="legend"><span><i style="background:var(--ok);border-radius:50%"></i>Хүчинтэй</span><span><i style="background:var(--warn);border-radius:50%"></i>Дөхсөн</span><span><i style="background:var(--bad);border-radius:50%"></i>Дууссан</span><span><i style="background:var(--none);border-radius:50%"></i>Сургалтгүй</span></div></div>
+      ${has ? `<div class="org-zoom" role="group" aria-label="Бүтцийн хэмжээ"><button class="btn btn-sm" data-act="org-zoom" data-z="-" title="Жижигрүүлэх">−</button><span class="zv" id="org-zv"></span><button class="btn btn-sm" data-act="org-zoom" data-z="+" title="Томруулах">+</button><button class="btn btn-sm" data-act="org-zoom" data-z="fit" title="Бүтцийг бүтнээр нь харуулах">Бүтнээр</button><button class="btn btn-sm" data-act="org-zoom" data-z="1" title="Жинхэнэ хэмжээ">100%</button></div>` : ''}
       ${edit && has ? `<div class="org-tools"><button class="btn btn-sm" data-act="org-add-root" data-dept="${deptId}">+ Дээд түвшинд нэмэх</button><button class="btn btn-sm" data-act="org-auto" data-dept="${deptId}" title="Хайрцагны нэр ажилтны албан тушаалтай таарвал автоматаар байрлуулна">Албан тушаалаар нь байрлуулах</button><button class="btn btn-sm btn-danger" data-act="org-clear" data-dept="${deptId}">Бүтцийг цэвэрлэх</button></div>` : ''}</div>
-    ${has ? `<div class="org-canvas">${orgChart(deptId, edit)}</div>
+    ${has ? `<div class="org-canvas" title="Ctrl + хулганы дугуйгаар зөвхөн бүтцийг томруулж, жижигрүүлнэ">${orgChart(deptId, edit)}</div>
       ${edit ? '<div class="panel-body" style="padding-top:0"><p class="org-hint">Хүнийг чирж өөр хайрцаг руу зөөнө (хоёр хүн байр солино) · хайрцгийн цэнхэр толгойноос чирж бүхэл хэсгийг өөр хүний доор зөөнө · <b>+</b> дарж доор нь хайрцаг нэмнэ, хүнийг <b>+</b> руу чирвэл шинэ хайрцаг үүсч байрлана · <b>⋯</b> дарж нэр солих, хүн сонгох, устгана.</p></div>' : ''}`
       : `<div class="panel-body" style="display:flex;flex-direction:column;gap:12px;align-items:flex-start">
           <p class="note">Энэ албанд бүтэц үүсгээгүй байна.</p>
@@ -1608,6 +1614,16 @@ function sessionCard(g){
     <div class="bk-ppl">${g.map(personChip).join('')}</div></div>`;
 }
 // Өдрөөр харагдацыг нээхэд өнөөдрийн (эсвэл дараагийн) өдрийг дэлгэцийн дээд хэсэгт гаргана. Дээш гүйлгэвэл өмнөх, доош бол дараах өдрүүд.
+// Албаны бүтцийг зөвхөн бүтцийн хэсэгт томруулах/жижигрүүлэх. 'fit' = бүтнээр нь багтаана.
+function applyOrgZoom(){
+  const cv = $('.org-canvas'), ch = cv?.querySelector('.org-chart'); if(!ch) return;
+  let z = S.orgZoom ?? 'fit';
+  if(z === 'fit'){ ch.style.zoom = 1; const avail = cv.clientWidth - 40, w = ch.scrollWidth; z = w > avail ? Math.max(.25, Math.floor(avail / w * 100) / 100) : 1; }
+  ch.style.zoom = z; const v = $('#org-zv'); if(v) v.textContent = Math.round(z * 100) + '%';
+  S.orgZ = z;
+}
+function setOrgZoom(z){ const cv = $('.org-canvas'), cx = cv ? (cv.scrollLeft + cv.clientWidth / 2) / (cv.scrollWidth || 1) : .5;
+  S.orgZoom = z; applyOrgZoom(); if(cv) cv.scrollLeft = cx * cv.scrollWidth - cv.clientWidth / 2; }
 function bkScrollToday(){ requestAnimationFrame(() => { const el = document.getElementById('bk-anchor'); if(!el || S.view !== 'book' || S.bv?.view !== 'day') return;
   const y = el.getBoundingClientRect().top + window.scrollY - 16; window.scrollTo({ top:Math.max(0, y), behavior:'auto' }); }); }
 function bkDayView(all){
@@ -2559,6 +2575,8 @@ const ACT = {
     openModal({ title:'Үнэмлэх CSV', wide:true, body:`<textarea class="inp mono" id="exp-csv" style="min-height:260px;font-size:12px" readonly>${esc(csv)}</textarea><div class="m-foot"><button class="btn" data-act="copy-csv">Хуулах</button><button class="btn btn-primary" data-act="dl-csv">Татах (.csv)</button></div>` }); },
   'bk-new': (a, ev) => { ev?.preventDefault(); S.openEmp = null; const tid = a.dataset.type ? Number(a.dataset.type) : undefined; const due = a.dataset.ids ? a.dataset.ids.split(',').map(Number) : tid ? (dueList().find(g => g.tid === tid)?.ids || []) : [];
     openModal({ title:'Сургалт захиалах', wide:true, body:bkForm(tid, due) }); },
+  'org-zoom': a => { const z = a.dataset.z, cur = S.orgZ || 1;
+    setOrgZoom(z === 'fit' ? 'fit' : z === '1' ? 1 : Math.min(2, Math.max(.25, Math.round((cur + (z === '+' ? .1 : -.1)) * 100) / 100))); },
   'bk-view': a => { S.bv.view = a.dataset.v; render(); bkScrollToday(); },
   'bk-only': a => { S.bv.only = a.dataset.o; if(S.bv.view === 'due') S.bv.view = 'day'; render(); },
   'bk-dept': a => { S.bv.dept = a.dataset.d; render(); },
@@ -2627,6 +2645,9 @@ document.addEventListener('dragleave', ev => { const z = ev.target.closest?.('[d
 document.addEventListener('drop', ev => { const z = ev.target.closest?.('[data-drop]'); if(!z) return; ev.preventDefault(); if(!S.admin) return denied(); z.classList.remove('over'); const f = ev.dataTransfer.files[0]; if(f) startImport(f); });
 function updBulkCount(){ const n = $$('.pick-list input:checked').length; const c = $('#b-count'); if(c) c.textContent = `${n} сонгосон`; }
 document.addEventListener('focusin', ev => { if(ev.target.id === 'tp-subj') S.tplFocus = 'subj'; else if(ev.target.id === 'tp-body') S.tplFocus = 'body'; });
+document.addEventListener('wheel', ev => { if(!(ev.ctrlKey || ev.metaKey)) return; const cv = ev.target.closest?.('.org-canvas'); if(!cv) return;
+  ev.preventDefault(); const cur = S.orgZ || 1; setOrgZoom(Math.min(2, Math.max(.25, Math.round((cur * (ev.deltaY < 0 ? 1.1 : 1 / 1.1)) * 100) / 100))); }, { passive:false });
+window.addEventListener('resize', () => { if((S.orgZoom ?? 'fit') === 'fit') applyOrgZoom(); });
 document.addEventListener('input', ev => {
   if(ev.target.dataset.ghf && S.ghf){ S.ghf[ev.target.dataset.ghf] = ev.target.value; const pos = ev.target.selectionStart, k = ev.target.dataset.ghf; render(); const n = document.querySelector(`[data-ghf="${k}"]`); if(n){ n.focus(); try{ n.setSelectionRange(pos, pos); } catch{} } return; }
   if('delq' in ev.target.dataset){ S.delQ = ev.target.value; const q = S.delQ.trim().toLowerCase(); const l = $('#del-list');
