@@ -309,7 +309,7 @@ body.ro .tbl td.num:has([data-act="renew"]),body.ro .tr-act,body.ro .drop,body.r
 .obox.gh::before{background:#2f9e5b}
 .obox.gh .ob-title{color:#23824a}
 .gh-st{display:inline-flex;flex-direction:column;gap:1px;font-size:12px;line-height:1.25;white-space:nowrap;padding:4px 8px;border-radius:8px;border:1px solid var(--line)}
-.gh-st b{font-weight:600}
+.gh-st b{font-weight:600} .gh-st small{font-size:10.5px;font-weight:500;opacity:.9}
 .gh-st.done{background:rgba(47,158,91,.12);border-color:rgba(47,158,91,.35);color:#23824a}
 .gh-st.late{background:rgba(214,64,64,.10);border-color:rgba(214,64,64,.35);color:var(--bad)}
 .gh-st.soon{background:rgba(224,160,40,.12);border-color:rgba(224,160,40,.4);color:#a26b00}
@@ -1038,7 +1038,7 @@ function viewGreen(){
       <td><span style="display:flex;gap:10px;align-items:center">${avatar(e || { full_name:g.full_name }, 'md')}<span>${e ? `<button data-act="profile" data-id="${e.id}" style="text-align:left;background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font:inherit"><b>${esc(e.full_name)}</b></button>` : `<b>${esc(g.full_name)}</b>`}<br><span class="muted mono" style="font-size:12px">${esc(g.sap || '')}</span>${e ? '' : ' <span class="faint" style="font-size:11px" title="Ажилтны жагсаалтад SAP кодоор олдсонгүй">· системд олдоогүй</span>'}</span></span></td>
       <td>${esc(g.position || e?.position || '—')}<br><span class="muted" style="font-size:12px">${esc(e ? deptName(e.department_id) : g.dept_name || '')}</span></td>
       <td class="mono">${fmtDate(g.start_on)}<br><span class="muted" style="font-size:12px">${days != null ? `${days} дэх хоног` : ''}</span></td>
-      ${GH_STEPS.map(st => { const x = ghState(g, st); return `<td><span class="gh-st ${x.c}" ${x.due ? `title="Хийх хугацаа: ${fmtDate(x.due)}"` : ''}><b>${esc(x.t)}</b></span></td>`; }).join('')}</tr>`; }).join('');
+      ${GH_STEPS.map(st => { const x = ghState(g, st); return `<td><span class="gh-st ${x.c}" ${x.due ? `title="Хийх хугацаа: ${fmtDate(x.due)}"` : ''}>${x.c === 'done' ? `<b>${esc(x.t)}</b>` : `<b>Хийгдээгүй</b>${x.due ? `<small>${esc(x.t)}</small>` : ''}`}</span></td>`; }).join('')}</tr>`; }).join('');
   return `<div class="page-head"><div><h1>${GH_ICON(26)} Ногоон малгайтай ажилчид</h1><p>Шинэ ажилтны ногоон малгай хөтөлбөр · 30, 60, 90 хоногийн үнэлгээ. "White hat confirmed" болсон ажилтан автоматаар цагаан малгайд шилжинэ.</p>
       ${last ? `<p class="faint" style="font-size:12px;margin:4px 0 0">Сүүлд шинэчилсэн: ${fmtDate(String(last.at).slice(0, 10))} · ${esc(last.file || '')}</p>` : ''}</div>
     <div class="actions">${S.admin ? `<label class="btn btn-primary" style="cursor:pointer">Ногоон малгайн Excel<input type="file" accept=".xlsx,.xls,.xlsm" data-ghimport hidden></label>` : ''}</div></div>
